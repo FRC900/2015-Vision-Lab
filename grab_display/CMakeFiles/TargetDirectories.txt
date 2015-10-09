@@ -1,1 +1,0 @@
-/home/ubuntu/Desktop/grab_display/CMakeFiles/display.dir
