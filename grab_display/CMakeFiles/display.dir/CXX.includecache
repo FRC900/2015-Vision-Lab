@@ -1,0 +1,44 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/ubuntu/Desktop/2015-Vision-Lab/grab_display/display.cpp
+opencv2/highgui/highgui.hpp
+/home/ubuntu/Desktop/2015-Vision-Lab/grab_display/opencv2/highgui/highgui.hpp
+opencv2/imgproc/imgproc.hpp
+/home/ubuntu/Desktop/2015-Vision-Lab/grab_display/opencv2/imgproc/imgproc.hpp
+opencv2/objdetect/objdetect.hpp
+/home/ubuntu/Desktop/2015-Vision-Lab/grab_display/opencv2/objdetect/objdetect.hpp
+highgui.h
+/home/ubuntu/Desktop/2015-Vision-Lab/grab_display/highgui.h
+opencv2/opencv.hpp
+-
+iostream
+-
+stdio.h
+-
+stdlib.h
+-
+sys/types.h
+-
+sys/stat.h
+-
+unistd.h
+-
+time.h
+-
+
+/usr/include/opencv/highgui.h
+opencv2/core/core_c.h
+/usr/include/opencv/opencv2/core/core_c.h
+opencv2/core/core.hpp
+/usr/include/opencv/opencv2/core/core.hpp
+opencv2/highgui/highgui_c.h
+/usr/include/opencv/opencv2/highgui/highgui_c.h
+opencv2/highgui/highgui.hpp
+/usr/include/opencv/opencv2/highgui/highgui.hpp
+
