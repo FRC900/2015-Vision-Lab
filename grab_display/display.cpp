@@ -18,12 +18,12 @@ int frequency = 2;
 int myblur= 2;
 int lowedge= 100;
 int highedge= 300;
-int BlueMax= 255;
-int BlueMin= 119;
-int RedMax= 145;
-int RedMin= 0;
-int GreenMax= 255;
-int GreenMin= 0;
+int HueMax= 153;
+int HueMin= 113;
+int SatMax= 255;
+int SatMin= 199;
+int ValMax= 255;
+int ValMin= 190;
 int dilation_size = 0;
 RNG rng(12345);
 
@@ -39,14 +39,14 @@ int main() {
 	
 	createTrackbar( "Kernel size:\n 2n + 1", "RangeControl", &dilation_size, 21);
 
-	createTrackbar("BlueMax","RangeControl", &BlueMax,255);
-	createTrackbar("BlueMin","RangeControl", &BlueMin,255);
+	createTrackbar("HueMax","RangeControl", &HueMax,255);
+	createTrackbar("HueMin","RangeControl", &HueMin,255);
 
-	createTrackbar("RedMax","RangeControl", &RedMax,255);
-	createTrackbar("RedMin","RangeControl", &RedMin,255);
+	createTrackbar("SatMax","RangeControl", &SatMax,255);
+	createTrackbar("SatMin","RangeControl", &SatMin,255);
 
-	createTrackbar("GreenMax","RangeControl", &GreenMax,255);
-	createTrackbar("Greenmin","RangeControl", &GreenMin,255);
+	createTrackbar("ValMax","RangeControl", &ValMax,255);
+	createTrackbar("Valmin","RangeControl", &ValMin,255);
 
 
 	createTrackbar("Blur","Parameters", &myblur,10);
@@ -60,6 +60,7 @@ int main() {
 		cout << "Capture not open" << endl;
 
 	Mat input;
+	Mat hsvinput;
 
 	vector<Mat> channels;
 	vector<Mat> temp2(3);
@@ -68,9 +69,9 @@ int main() {
 	bool isColor = true;
 
 	Mat temp;
-	Mat red;
-	Mat green;
-	Mat blue;
+	Mat hue;
+	Mat sat;
+	Mat val;
 
 	//inputVideo >> input;
 
@@ -81,7 +82,8 @@ int main() {
 	
 
 	while(1) {
-		input = imread("/home/ubuntu/Desktop/Secret Test Images/10 ft 00 deg.jpg",CV_LOAD_IMAGE_COLOR);
+		input = imread("/home/ubuntu/Desktop/Secret Test Images/15 ft 00 deg.jpg",CV_LOAD_IMAGE_COLOR);
+		cvtColor( input, hsvinput, CV_BGR2HSV);
 		Mat zero = Mat::zeros(input.rows, input.cols, CV_8UC1);
 
 		//inputVideo >> input;
@@ -89,7 +91,7 @@ int main() {
 			frequency = 1;
 		if(count % frequency == 0)
 			isColor = !isColor;
-		split(input, channels);
+		split(hsvinput, channels);
 
 
 		/* if(!isColor) 
@@ -102,8 +104,8 @@ int main() {
 
 		
 
-		imshow("Original", input);
-
+		imshow("HSV", hsvinput);
+		/*
 		temp2[0] = channels[0];
 		temp2[1] = zero;
 		temp2[2] = zero;
@@ -119,13 +121,13 @@ int main() {
 		temp2[2] = channels[2];
 		merge(temp2, red);
 		//imshow("Red", red);
-
+		*/
 		vector<Mat> comp(3);
 		
 
-                inRange(channels[0], BlueMin, BlueMax, comp[0]);
-		inRange(channels[1], GreenMin, GreenMax, comp[1]);
-		inRange(channels[2], RedMin, RedMax, comp[2]);
+                inRange(channels[0], HueMin, HueMax, comp[0]);
+		inRange(channels[1], SatMin, SatMax, comp[1]);
+		inRange(channels[2], ValMin, ValMax, comp[2]);
 
 		Mat btrack;
 
@@ -163,6 +165,9 @@ Canny(btrack, temp, lowedge, highedge, 3);
   vector<Point2f> mc( contours.size() );
   for( int i = 0; i < contours.size(); i++ )
      { mc[i] = Point2f( mu[i].m10/mu[i].m00 , mu[i].m01/mu[i].m00 ); }
+
+
+
 
 
   /// Draw contours
