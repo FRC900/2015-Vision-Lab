@@ -25,8 +25,52 @@ int ValMax= 255;
 int ValMin= 190;
 int dilation_size = 0;
 RNG rng(12345);
-
-
+Rect findRect(Mat &input, int HMin, int HMax, int SMin, int SMax, int VMin, int VMax)
+{
+        vector<Mat> channels;
+        split(input, channels);
+        vector<Mat> comp(3);
+        inRange(channels[0], HMin, HMax, comp[0]);
+        inRange(channels[1], SMin, SMax, comp[1]);
+        inRange(channels[2], VMin, VMax, comp[2]);
+        Mat btrack;
+        bitwise_and(comp[0], comp[1], btrack);
+        bitwise_and(btrack, comp[2], btrack);
+        vector<vector<Point> > contours;
+        vector<Vec4i> hierarchy;
+        vector<Point> points;
+        findContours( btrack, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0) );
+        vector<Rect> boundRect( contours.size() );
+        for( int i = 0; i < contours.size(); i++ )
+        {
+            for( int j = 0; j < contours[i].size(); j++)
+            {
+                points.push_back(contours[i][j]);
+            }
+        }
+        return boundingRect(points);
+}
+Rect resizeRect(Rect &input, float ratio)
+{
+    Size rectsize = input.size();
+    int width = rectsize.width;
+    int height = rectsize.height;
+    if (width / ratio > height)
+    {
+        height = width / ratio;
+    }
+    else if (width / ratio < height)
+    {
+        width = height * ratio;
+    }
+    Point tl = input.tl();
+    tl.x = tl.x - (width - rectsize.width)/2;
+    tl.y = tl.y - (height - rectsize.height)/2;
+    Point br = input.br();
+    br.x = br.x + (width - rectsize.width)/2;
+    br.y = br.y + (height - rectsize.height)/2;
+    return Rect(tl, br);
+}
 int main() {
     namedWindow("Original", WINDOW_AUTOSIZE);
     //namedWindow("Parameters",WINDOW_AUTOSIZE);
@@ -75,7 +119,7 @@ int main() {
     //inputVideo >> input;
 
     while(1) {
-        input = imread("/home/eblau/code/2015VisionCode/camera_cal/Secret Test Images/15 ft 00 deg.jpg",CV_LOAD_IMAGE_COLOR);
+        input = imread("/Users/benjamindecker/2015-Vision-Lab/grab_display/Secret Test Images/15 ft 00 deg.jpg",CV_LOAD_IMAGE_COLOR);
         cvtColor( input, hsvinput, CV_BGR2HSV);
         Mat zero = Mat::zeros(input.rows, input.cols, CV_8UC1);
 
@@ -155,7 +199,9 @@ int main() {
         {
             mu[i] = moments( contours[i], false );
         }
-
+        Rect boundRect;
+        boundRect = findRect(hsvinput, HueMin, HueMax, SatMin, SatMax, ValMin, ValMax);
+        boundRect = resizeRect(boundRect, 1.33);
         ///  Get the mass centers:
         vector<Point2f> mc( contours.size() );
         for( int i = 0; i < contours.size(); i++ )
@@ -169,10 +215,11 @@ int main() {
         {
             std::cout<<contours.size()<<std::endl;
             Scalar color = Scalar( rng.uniform(0, 255), rng.uniform(0,255), rng.uniform(0,255) );
-            drawContours( input, contours, i, color, 2, 8, hierarchy, 0, Point() );
+            //drawContours( input, contours, i, color, 2, 8, hierarchy, 0, Point() );
             circle( input, mc[i], 4, color, -1, 8, 0 );
         }
-
+        Scalar color = Scalar( rng.uniform(0, 255), rng.uniform(0,255), rng.uniform(0,255) );
+        rectangle( input, boundRect, color ,2 );
         //imshow("temp", temp);
         imshow("Edges", input);
         count++;
