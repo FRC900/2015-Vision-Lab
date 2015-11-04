@@ -27,6 +27,7 @@ int dilation_size = 0;
 RNG rng(12345);
 Rect findRect(Mat &input, int HMin, int HMax, int SMin, int SMax, int VMin, int VMax)
 {
+        //splits the input into channels, which it then evaluates by range
         vector<Mat> channels;
         split(input, channels);
         vector<Mat> comp(3);
@@ -50,7 +51,7 @@ Rect findRect(Mat &input, int HMin, int HMax, int SMin, int SMax, int VMin, int 
         }
         return boundingRect(points);
 }
-Rect resizeRect(Rect &input, float ratio)
+Rect adjustRect(Rect &input, float ratio)
 {
     Size rectsize = input.size();
     int width = rectsize.width;
@@ -70,6 +71,35 @@ Rect resizeRect(Rect &input, float ratio)
     br.x = br.x + (width - rectsize.width)/2;
     br.y = br.y + (height - rectsize.height)/2;
     return Rect(tl, br);
+}
+Rect resizeRect(Rect &input, float pMax)
+{
+    int intMax = int(pMax * 100 + .5);
+    float adjust = rng.uniform(0,intMax);
+    Size rectsize = input.size();
+    float width = rectsize.width * (1 + adjust/100);
+    int intwidth = int(width+.5);
+    float height = rectsize.height * (1 + adjust/100);
+    int intheight = int(height+.5);
+    Point tl = input.tl();
+    tl.x = tl.x - (width - rectsize.width)/2;
+    tl.y = tl.y - (height - rectsize.height)/2;
+    Point br = input.br();
+    br.x = br.x + (width - rectsize.width)/2;
+    br.y = br.y + (height - rectsize.height)/2;
+    return Rect(tl, br); 
+}
+Mat rgbValThresh(int HMin,int HMax,int SMin,int SMax,int VMin, int VMax)
+{
+    Mat color = (Mat_<cv::Vec3b>(1,2) << Vec3b(HMin,SMin,VMin), Vec3b(HMax,SMax,VMax));
+    cvtColor(color, color, COLOR_HSV2BGR);
+    int valB = (color.at<cv::Vec3b>(1,1)[0] - color.at<cv::Vec3b>(1,2)[0])/2;
+    int valG = (color.at<cv::Vec3b>(1,1)[1] - color.at<cv::Vec3b>(1,2)[1])/2;
+    int valR = (color.at<cv::Vec3b>(1,1)[2] - color.at<cv::Vec3b>(1,2)[2])/2;
+    int threshB = valB - color.at<cv::Vec3b>(1,1)[0];
+    int threshG = valG - color.at<cv::Vec3b>(1,1)[1];
+    int threshR = valR - color.at<cv::Vec3b>(1,1)[2];
+    return (Mat_<cv::Vec3b>(1,2) << Vec3b(valB,valG,valR), Vec3b(threshB, threshG, threshR));
 }
 int main() {
     namedWindow("Original", WINDOW_AUTOSIZE);
@@ -201,7 +231,8 @@ int main() {
         }
         Rect boundRect;
         boundRect = findRect(hsvinput, HueMin, HueMax, SatMin, SatMax, ValMin, ValMax);
-        boundRect = resizeRect(boundRect, 1.33);
+        boundRect = adjustRect(boundRect, 1.33);
+        boundRect = resizeRect(boundRect, .2);
         ///  Get the mass centers:
         vector<Point2f> mc( contours.size() );
         for( int i = 0; i < contours.size(); i++ )
@@ -213,7 +244,6 @@ int main() {
         Mat drawing = Mat::zeros( temp.size(), CV_8UC3 );
         for( int i = 0; i< contours.size(); i++ )
         {
-            std::cout<<contours.size()<<std::endl;
             Scalar color = Scalar( rng.uniform(0, 255), rng.uniform(0,255), rng.uniform(0,255) );
             //drawContours( input, contours, i, color, 2, 8, hierarchy, 0, Point() );
             circle( input, mc[i], 4, color, -1, 8, 0 );
