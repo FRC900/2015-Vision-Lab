@@ -41,7 +41,7 @@ Rect findRect(Mat &input, int HMin, int HMax, int SMin, int SMax, int VMin, int 
         vector<Vec4i> hierarchy;
         vector<Point> points;
         findContours( btrack, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0) );
-        vector<Rect> boundRect( contours.size() );
+        vector<Rect> boundRect(contours.size());
         for( int i = 0; i < contours.size(); i++ )
         {
             for( int j = 0; j < contours[i].size(); j++)
@@ -93,12 +93,12 @@ Mat rgbValThresh(int HMin,int HMax,int SMin,int SMax,int VMin, int VMax)
 {
     Mat color = (Mat_<cv::Vec3b>(1,2) << Vec3b(HMin,SMin,VMin), Vec3b(HMax,SMax,VMax));
     cvtColor(color, color, COLOR_HSV2BGR);
-    int valB = (color.at<cv::Vec3b>(1,1)[0] - color.at<cv::Vec3b>(1,2)[0])/2;
-    int valG = (color.at<cv::Vec3b>(1,1)[1] - color.at<cv::Vec3b>(1,2)[1])/2;
-    int valR = (color.at<cv::Vec3b>(1,1)[2] - color.at<cv::Vec3b>(1,2)[2])/2;
-    int threshB = valB - color.at<cv::Vec3b>(1,1)[0];
-    int threshG = valG - color.at<cv::Vec3b>(1,1)[1];
-    int threshR = valR - color.at<cv::Vec3b>(1,1)[2];
+    int valB = (color.at<cv::Vec3b>(0,0)[0] - color.at<cv::Vec3b>(0,1)[0])/2;
+    int valG = (color.at<cv::Vec3b>(0,0)[1] - color.at<cv::Vec3b>(0,1)[1])/2;
+    int valR = (color.at<cv::Vec3b>(0,0)[2] - color.at<cv::Vec3b>(0,1)[2])/2;
+    int threshB = valB - color.at<cv::Vec3b>(0,0)[0];
+    int threshG = valG - color.at<cv::Vec3b>(0,0)[1];
+    int threshR = valR - color.at<cv::Vec3b>(0,0)[2];
     return (Mat_<cv::Vec3b>(1,2) << Vec3b(valB,valG,valR), Vec3b(threshB, threshG, threshR));
 }
 int main() {
@@ -119,7 +119,7 @@ int main() {
     createTrackbar("SatMin","RangeControl", &SatMin,255);
 
     createTrackbar("ValMax","RangeControl", &ValMax,255);
-    createTrackbar("Valmin","RangeControl", &ValMin,255);
+    createTrackbar("ValMin","RangeControl", &ValMin,255);
 
 
     createTrackbar("Blur","Parameters", &myblur,10);
@@ -145,9 +145,10 @@ int main() {
     Mat hue;
     Mat sat;
     Mat val;
+    Mat rgbVal;
 
     //inputVideo >> input;
-
+    rgbVal = rgbValThresh(HueMin, HueMax, SatMin, SatMax, ValMin, ValMax);
     while(1) {
         input = imread("/Users/benjamindecker/2015-Vision-Lab/grab_display/Secret Test Images/15 ft 00 deg.jpg",CV_LOAD_IMAGE_COLOR);
         cvtColor( input, hsvinput, CV_BGR2HSV);
