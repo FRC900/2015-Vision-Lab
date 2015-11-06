@@ -133,7 +133,7 @@ int main() {
     createTrackbar("SatMin","RangeControl", &SatMin,255);
 
     createTrackbar("ValMax","RangeControl", &ValMax,255);
-    createTrackbar("Valmin","RangeControl", &ValMin,255);
+    createTrackbar("ValMin","RangeControl", &ValMin,255);
 
 
     createTrackbar("Blur","Parameters", &myblur,10);
@@ -159,11 +159,12 @@ int main() {
     Mat hue;
     Mat sat;
     Mat val;
+    Mat rgbVal;
 
     //inputVideo >> input;
-
+    rgbVal = rgbValThresh(HueMin, HueMax, SatMin, SatMax, ValMin, ValMax);
     while(1) {
-        input = imread("/home/eblau/code/2015VisionCode/camera_cal/Secret Test Images/15 ft 00 deg.jpg",CV_LOAD_IMAGE_COLOR);
+        input = imread("/Users/benjamindecker/2015-Vision-Lab/grab_display/Secret Test Images/15 ft 00 deg.jpg",CV_LOAD_IMAGE_COLOR);
         cvtColor( input, hsvinput, CV_BGR2HSV);
         Mat zero = Mat::zeros(input.rows, input.cols, CV_8UC1);
 
