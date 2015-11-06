@@ -107,12 +107,12 @@ Mat rgbValThresh(int HMin,int HMax,int SMin,int SMax,int VMin, int VMax)
 {
     Mat color = (Mat_<cv::Vec3b>(1,2) << Vec3b(HMin,SMin,VMin), Vec3b(HMax,SMax,VMax));
     cvtColor(color, color, COLOR_HSV2BGR);
-    int valB = (color.at<cv::Vec3b>(1,1)[0]/2) + (color.at<cv::Vec3b>(1,2)[0])/2;
-    int valG = (color.at<cv::Vec3b>(1,1)[1]/2) + (color.at<cv::Vec3b>(1,2)[1])/2;
-    int valR = (color.at<cv::Vec3b>(1,1)[2]/2) + (color.at<cv::Vec3b>(1,2)[2])/2;
-    int threshB = valB - color.at<cv::Vec3b>(1,1)[0];
-    int threshG = valG - color.at<cv::Vec3b>(1,1)[1];
-    int threshR = valR - color.at<cv::Vec3b>(1,1)[2];
+    int valB = (color.at<cv::Vec3b>(0,0)[0]/2) + (color.at<cv::Vec3b>(0,1)[0])/2;
+    int valG = (color.at<cv::Vec3b>(0,0)[1]/2) + (color.at<cv::Vec3b>(0,1)[1])/2;
+    int valR = (color.at<cv::Vec3b>(0,0)[2]/2) + (color.at<cv::Vec3b>(0,1)[2])/2;
+    int threshB = valB - color.at<cv::Vec3b>(0,0)[0];
+    int threshG = valG - color.at<cv::Vec3b>(0,0)[1];
+    int threshR = valR - color.at<cv::Vec3b>(0,0)[2];
     return (Mat_<cv::Vec3b>(1,2) << Vec3b(valB,valG,valR), Vec3b(threshB, threshG, threshR));
 }
 int main() {
