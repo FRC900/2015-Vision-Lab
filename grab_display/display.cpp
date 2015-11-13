@@ -17,42 +17,47 @@ int frequency = 2;
 int myblur= 2;
 int lowedge= 100;
 int highedge= 300;
-int HueMax= 153;
-int HueMin= 113;
+int HueMax= 170;
+int HueMin= 130;
 int SatMax= 255;
-int SatMin= 199;
+int SatMin= 147;
 int ValMax= 255;
-int ValMin= 190;
-int dilation_size = 0;
+int ValMin= 48;
+int dilation_size = 2;
 RNG rng(12345);
-Rect findRect(Mat &input, int HMin, int HMax, int SMin, int SMax, int VMin, int VMax)
+bool findRect(Mat &input, Rect &output, int HMin, int HMax, int SMin, int SMax, int VMin, int VMax)
 {
-        //splits the input into channels, which it then evaluates by range
-        vector<Mat> channels;
-        split(input, channels);
-        vector<Mat> comp(3);
-        inRange(channels[0], HMin, HMax, comp[0]);
-        inRange(channels[1], SMin, SMax, comp[1]);
-        inRange(channels[2], VMin, VMax, comp[2]);
+        /* prec: input image &input, integers 0-255 for each min and max HSV value
+        *  postc: a rectangle bounding the image we want
+        *  takes the input image, filters to only find values in the range we want, finds
+        *  the counters of the object and bounds it with a rectangle
+        */
         Mat btrack;
-        bitwise_and(comp[0], comp[1], btrack);
-        bitwise_and(btrack, comp[2], btrack);
+        inRange(input, Scalar(HMin, SMin, VMin), Scalar(HMax, SMax, VMax), btrack);
         vector<vector<Point> > contours;
         vector<Vec4i> hierarchy;
         vector<Point> points;
+        vector<Point> empty;
         findContours( btrack, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0) );
-        vector<Rect> boundRect( contours.size() );
-        for( int i = 0; i < contours.size(); i++ )
+        int screenContour = -1;
+        for( size_t i = 0; i < hierarchy.size(); i++ )
         {
-            for( int j = 0; j < contours[i].size(); j++)
+            if(hierarchy[i][3] >= 0 && boundingRect(contours[i]).area() > 500)
             {
-                points.push_back(contours[i][j]);
+                points = contours[i];
+                break;
             }
         }
-        return boundingRect(points);
+        if(points == empty)
+        {
+            return false;
+        }
+        output = boundingRect(points);
+        return true;
 }
 Rect adjustRect(Rect &input, float ratio)
 {
+    // adjusts the size of the rectangle to a fixed aspect ratio 
     Size rectsize = input.size();
     int width = rectsize.width;
     int height = rectsize.height;
@@ -74,6 +79,8 @@ Rect adjustRect(Rect &input, float ratio)
 }
 bool resizeRect(Rect &theRect, float pMax, const Mat imageCool)
 {
+    //takes the rect &theRect and randomly resizes it larger within range pMax, outputs the rect
+    //to image imageCool
     Point tl = theRect.tl();
     Point br = theRect.br();
     int sanityCount = 0;
@@ -105,6 +112,7 @@ bool resizeRect(Rect &theRect, float pMax, const Mat imageCool)
 }
 Mat rgbValThresh(int HMin,int HMax,int SMin,int SMax,int VMin, int VMax)
 {
+    //takes the HSV min/max values and returns as RGB middle value +- threshold
     Mat color = (Mat_<cv::Vec3b>(1,2) << Vec3b(HMin,SMin,VMin), Vec3b(HMax,SMax,VMax));
     cvtColor(color, color, COLOR_HSV2BGR);
     int valB = (color.at<cv::Vec3b>(0,0)[0]/2) + (color.at<cv::Vec3b>(0,1)[0])/2;
@@ -164,7 +172,7 @@ int main() {
     //inputVideo >> input;
     rgbVal = rgbValThresh(HueMin, HueMax, SatMin, SatMax, ValMin, ValMax);
     while(1) {
-        input = imread("/Users/benjamindecker/2015-Vision-Lab/grab_display/Secret Test Images/15 ft 00 deg.jpg",CV_LOAD_IMAGE_COLOR);
+        input = imread("/Users/benjamindecker/2015-Vision-Lab/grab_display/bin_chroma_edited.png",CV_LOAD_IMAGE_COLOR);
         cvtColor( input, hsvinput, CV_BGR2HSV);
         Mat zero = Mat::zeros(input.rows, input.cols, CV_8UC1);
 
@@ -245,9 +253,20 @@ int main() {
             mu[i] = moments( contours[i], false );
         }
         Rect boundRect;
-        boundRect = findRect(hsvinput, HueMin, HueMax, SatMin, SatMax, ValMin, ValMax);
+        bool exists;
+        exists = findRect(hsvinput, boundRect, HueMin, HueMax, SatMin, SatMax, ValMin, ValMax);
+        if(exists == false)
+        {
+            cout << "No rectangle found!";
+            continue;
+        }
         boundRect = adjustRect(boundRect, 1.33);
-        resizeRect(boundRect, .2, hsvinput);
+        exists = resizeRect(boundRect, .2, hsvinput);
+        if(exists == false)
+        {
+            cout << "Could not resize rectangle!";
+            continue;
+        }
         Mat boundMat = input(boundRect).clone();
         imshow("boundMat", boundMat);
 
@@ -264,7 +283,7 @@ int main() {
         {
             Scalar color = Scalar( rng.uniform(0, 255), rng.uniform(0,255), rng.uniform(0,255) );
             //drawContours( input, contours, i, color, 2, 8, hierarchy, 0, Point() );
-            circle( input, mc[i], 4, color, -1, 8, 0 );
+            //circle( input, mc[i], 4, color, -1, 8, 0 );
         }
         Scalar color = Scalar( rng.uniform(0, 255), rng.uniform(0,255), rng.uniform(0,255) );
         rectangle( input, boundRect, color ,2 );
