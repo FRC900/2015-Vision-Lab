@@ -1,1 +1,0 @@
-/home/ubuntu/Desktop/2015-Vision-Lab/grab_display/CMakeFiles/display.dir
