@@ -15,6 +15,10 @@
 *.a
 
 # Executables
+CaffeBatchPrediction
+CaffePrediction
+display
+opencv_createsamples_color
 *.exe
 *.stackdump
 
