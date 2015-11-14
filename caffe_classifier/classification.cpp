@@ -291,38 +291,31 @@ int main(int argc, char** argv) {
   cv::Mat img = cv::imread(file, -1);
   CHECK(!img.empty()) << "Unable to decode image " << file;
 
-  bool exit = false;
-  UserData ud;
-  //cv::setMouseCallback("Image", CallBackFunc, &ud);
   cv::Mat imgCopy(img.clone());
   cv::Mat imgCrop;
-  std::vector<cv::Rect> detects;
-  std::vector<float> weights;
-  int key;
+
+  typedef std::pair<cv::Rect, float> Detected;
+  std::vector<Detected> detected;
+
   int size = 700;
   int step = 6;
   double start = gtod_wrapper();
 
   do
-	//imshow("Image", img);
-	//cv::waitKey(0);
   {
-     for (int c = 0; (c + size) < img.cols; c+= step)
+     for (int c = 0; (c + size) < img.cols; c += step)
      {
-	for (int r = 0; (r + size) < img.rows; r+=step)
+	for (int r = 0; (r + size) < img.rows; r += step)
 	{
 	   cv::Rect rect(c, r, size, size);
 	   imgCrop = imgCopy(rect);
-	   std::vector<Prediction> predictions = classifier.Classify(imgCrop,6);
+	   std::vector<Prediction> predictions = classifier.Classify(imgCrop, 1);
 	   for (std::vector<Prediction>::const_iterator it = predictions.begin(); it != predictions.end(); ++it)
 	   {
 	      if (it->first == "bin") 
 	      {
 		 if (it->second > 0.9)
-		 {
-		    detects.push_back(rect);
-		    weights.push_back(it->second);
-		 }
+		    detected.push_back(Detected(rect, it->second));
 		 break;
 	      }
 	   }
@@ -333,18 +326,26 @@ int main(int argc, char** argv) {
   double end = gtod_wrapper();
   std::cout << "Elapsed time = " << (end - start) << std::endl;
 
-  //namedWindow("Image", cv::WINDOW_AUTOSIZE);
-  //imshow("Image", img);
-  //cv::waitKey(0);
+  namedWindow("Image", cv::WINDOW_AUTOSIZE);
+  for (std::vector<Detected>::const_iterator it = detected.begin(); it != detected.end(); ++it)
+  {
+     std::cout << it->first << " " << it->second << std::endl;
+     rectangle(img, it->first, cv::Scalar(0,0,255));
+  }
+  imshow("Image", img);
+  cv::waitKey(0);
   return 0;
 
+  UserData ud;
+  bool exit = false;
+  cv::setMouseCallback("Image", CallBackFunc, &ud);
   while (!exit)
   {
      imgCopy = img.clone();
      rectangle (imgCopy, ud.upperLeft, ud.lowerRight, CV_RGB(255,0,0));
      imshow("Image", imgCopy);
 
-     key = cv::waitKey(5);
+     int key = cv::waitKey(5);
      if (key == 27)
 	exit = true;
      else if (key == ' ' )

@@ -347,9 +347,8 @@ int main(int argc, char *argv[])
    std::vector<cv::Mat> imgs;
    std::vector<cv::Rect> rects;
    cv::Mat imgCopy(img.clone());
-   std::vector<cv::Rect> detects;
-   std::vector<float> weights;
-   int key;
+   typedef std::pair<cv::Rect, float> Detected;
+   std::vector<Detected> detected;
 
    int size = 700;
    int step = 6;
@@ -376,9 +375,9 @@ int main(int argc, char *argv[])
 #else
    do
    {
-      for (int c = 0; (c + size) < img.cols; c+= step)
+      for (int c = 0; (c + size) < img.cols; c += step)
       {
-	 for (int r = 0; (r + size) < img.rows; r+=step)
+	 for (int r = 0; (r + size) < img.rows; r +=step)
 	 {
 	    rects.push_back(cv::Rect(c, r, size, size));
 	    imgs.push_back(imgCopy(rects[rects.size() - 1]));
@@ -387,15 +386,12 @@ int main(int argc, char *argv[])
 	       std::vector <std::vector<Prediction> >predictions = classifier.ClassifyBatch(imgs, 6);
 	       for (size_t i = 0; i < predictions.size(); ++i)
 	       {
-		  for (std::vector <Prediction>::const_iterator it = predictions[i].begin();  it != predictions[i].end(); ++it)
+		  for (std::vector <Prediction>::const_iterator it = predictions[i].begin(); it != predictions[i].end(); ++it)
 		  {
 		     if (it->first == "bin") 
 		     {
 			if (it->second > 0.9)
-			{
-			   detects.push_back(rects[i]);
-			   weights.push_back(it->second);
-			}
+			   detected.push_back(Detected(rects[i], it->second));
 			break;
 		     }
 		  }
@@ -411,7 +407,14 @@ int main(int argc, char *argv[])
    std::cout << "Elapsed time = " << (end - start) << std::endl;
 #endif
 
-   //cv::waitKey(0);
+  namedWindow("Image", cv::WINDOW_AUTOSIZE);
+  for (std::vector<Detected>::const_iterator it = detected.begin(); it != detected.end(); ++it)
+  {
+     std::cout << it->first << " " << it->second << std::endl;
+     rectangle(img, it->first, cv::Scalar(0,0,255));
+  }
+  imshow("Image", img);
+  cv::waitKey(0);
    return 0;
 #if 0
    std::cout << "---------- Prediction for " << file << " ----------" << std::endl;
