@@ -8,9 +8,27 @@
 *.so.*
 *.dylib
 
+# Intermediate files
+*.o
+*.obj
+*.lib
+*.a
+
 # Executables
 *.exe
+*.stackdump
+
+# Backups and temps from editors
+*~
+*.bak
+*.sw[po]
 
 # Metadata
 *.aliases
 *.lvlps
+
+# CMake output
+CMakeFiles
+CMakeCache.txt
+cmake_install.cmake
+Makefile
