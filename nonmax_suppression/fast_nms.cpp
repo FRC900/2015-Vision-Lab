@@ -5,104 +5,30 @@
  * @blackball (bugway@gmail.com)
  */
 
-#include <opencv2/core/core.hpp>
-#include <vector>
 #include <algorithm>
 #include <iostream>
 
-// Detected rectangle. Tracks a rectangle, its relative score and whether 
-// or not it has been filtered out as a non-maximum version of a better DRect
-// close by.
-class DRect {
-   public :
-      // Constructor given an upper left and lower right coordinate pair
-      DRect(int x0, int y0, int x1, int y1, float _score) :
-         rect(cv::Point(x0, y0), cv::Point(x1+1, y1+1)),
-         score(_score),
-         keep(true)
-      {
-      }
-      DRect(const cv::Rect &_rect, float _score) :
-         rect(_rect),
-         score(_score),
-         keep(true)
-      {
-      }
-
-      // Used for testing overlap between near-by rectangles
-      float invArea(void) const
-      {
-         return 1.0f / rect.area();
-      }
-
-      // Getters for rectangle coords
-      int x0(void) const
-      {
-         return rect.x;
-      }
-      int y0(void) const
-      {
-         return rect.y;
-      }
-      int x1(void) const
-      {
-         return rect.x + rect.width - 1;
-      }
-      int y1(void) const
-      {
-         return rect.y + rect.height - 1;
-      }
-
-      // Mark as invalid - this is a non-maximum version
-      // of another, better DRect
-      void invalidate(void)
-      {
-         keep = false;
-      }
-      bool valid(void)
-      {
-         return keep;
-      }
-
-      // Debugging stuff
-      void print(void) const
-      {
-         std::cout << "x0 = " << this->x0();
-         std::cout << " y0 = " << this->y0();
-         std::cout << " x1 = " << this->x1();
-         std::cout << " y1 = " << this->y1();
-         std::cout << " score = " << score;
-         std::cout << " valid = " << keep;
-         std::cout << std::endl;
-      }
-
-      // Helper functions for std::sort
-      bool operator< (const DRect &rhs) const
-      {
-         return score < rhs.score;
-      }
-      bool operator> (const DRect &rhs) const
-      {
-         return score > rhs.score;
-      }
-   private:
-      cv::Rect rect;  // detected rectangle coordinates
-      float    score; // detection score
-      bool     keep;  // still in the running for a local maximum?
-};
+#include "fast_nms.hpp"
 
 // TODO : see if these hacks really are faster or not
 #define fast_max(x,y) (x - ((x - y) & ((x - y) >> (sizeof(int) * CHAR_BIT - 1))))
 #define fast_min(x,y) (y + ((x - y) & ((x - y) >> (sizeof(int) * CHAR_BIT - 1))))
 
-void 
-fast_nms(std::vector<DRect> &rects, float overlap_th, std::vector<DRect> &pick) 
+static bool detectedCompareGreater(const Detected &rh, const Detected &lh)
 {
-   pick.clear(); // Clear out return array
+   return rh.second > lh.second;
+}
+
+void 
+fastNMS(std::vector<Detected> detected, float overlap_th, std::vector<cv::Rect> &filteredList) 
+{
+   filteredList.clear(); // Clear out return array
 
    // Sort input rects by decreasing score - i.e. look at best
    // values first
-   std::sort(rects.begin(), rects.end(), std::greater<DRect>());
+   std::sort(detected.begin(), detected.end(), detectedCompareGreater);
+
+   std::vector<bool> validList(detected.size(), true);
 
    // Loop while there's anything valid left in rects array
    bool anyValid = true;
@@ -111,46 +37,46 @@ fast_nms(std::vector<DRect> &rects, float overlap_th, std::vector<DRect> &pick)
       anyValid = false; // assume there's nothing valid, adjust later if needed
 
       // Look for first valid entry in rects
-      std::vector<DRect>::iterator it = rects.begin();
-      for (; it != rects.end(); ++it)
-	 if (it->valid())
+      size_t i;
+      for (i = 0; i < validList.size(); ++i)
+	 if (validList[i])
 	    break;
 
       // Exit if none are found
-      if (it == rects.end())
+      if (i == validList.size())
 	 break;
 
       // Save the highest ranked remaining DRect
       // and invalidate it - this means we've already
       // processed it
-      pick.push_back(*it);
-      it->invalidate();
+      filteredList.push_back(detected[i].first);
+      validList[i] = false;
 
       // Save coords of this DRect so we can
       // filter out nearby DRects which have a lower
       // ranking
-      int x0 = it->x0();
-      int y0 = it->y0();
-      int x1 = it->x1();
-      int y1 = it->y1();
-
+      int x0 = detected[i].first.tl().x;
+      int y0 = detected[i].first.tl().y;
+      int x1 = detected[i].first.br().x;
+      int y1 = detected[i].first.br().y;
 
       // Loop through the rest of the array, looking
       // for entries which overlap with the current "good"
       // one being processed
-      for (++it; it != rects.end(); ++it) 
+      for (++i; i < detected.size() ; ++i) 
       {
-	 if (it->valid())
+	 if (validList[i])
 	 {
-	    int tx0 = fast_max(x0, it->x0());
-	    int ty0 = fast_max(y0, it->y0());
-	    int tx1 = fast_min(x1, it->x1());
-	    int ty1 = fast_min(y1, it->y1());
+	    int tx0 = fast_max(x0, detected[i].first.tl().x);
+	    int ty0 = fast_max(y0, detected[i].first.tl().y);
+	    int tx1 = fast_min(x1, detected[i].first.br().x);
+	    int ty1 = fast_min(y1, detected[i].first.br().y);
 
 	    tx0 = tx1 - tx0 + 1;
 	    ty0 = ty1 - ty0 + 1;
-	    if ((tx0 > 0) && (ty0 > 0) && ((tx0 * ty0 * it->invArea()) > overlap_th)) 
-	       it->invalidate(); // invalidate DRects which overlap
+	    if ((tx0 > 0) && (ty0 > 0) && 
+		((tx0 * ty0 / (float)detected[i].first.area()) > overlap_th)) 
+	       validList[i] = false; // invalidate DRects which overlap
 	    else
 	       anyValid = true;  // otherwise indicate that there's stuff left to do next time
 	 }
@@ -159,22 +85,23 @@ fast_nms(std::vector<DRect> &rects, float overlap_th, std::vector<DRect> &pick)
    while (anyValid);
 }
 
+#if 0
 static void 
 test_nn() 
 {
-   std::vector<DRect> rects;
-   std::vector<DRect> keep;
+   std::vector<Detected> rects;
+   std::vector<cv::Rect> keep;
 
-   rects.push_back(DRect(0,  0,  10, 10, 0.5f));
-   rects.push_back(DRect(1,  1,  10, 10, 0.4f));
-   rects.push_back(DRect(20, 20, 40, 40, 0.3f));
-   rects.push_back(DRect(20, 20, 40, 30, 0.4f));
-   rects.push_back(DRect(15, 20, 40, 40, 0.1f));
+   rects.push_back(Detected(cv::Rect(cv::Point(0,  0),  cv::Point(10+1, 10+1)), 0.5f));
+   rects.push_back(Detected(cv::Rect(cv::Point(1,  1),  cv::Point(10+1, 10+1)), 0.4f));
+   rects.push_back(Detected(cv::Rect(cv::Point(20, 20), cv::Point(40+1, 40+1)), 0.3f));
+   rects.push_back(Detected(cv::Rect(cv::Point(20, 20), cv::Point(40+1, 30+1)), 0.4f));
+   rects.push_back(Detected(cv::Rect(cv::Point(15, 20), cv::Point(40+1, 40+1)), 0.1f));
    
-   fast_nms(rects, 0.4f, keep);
+   fastNMS(rects, 0.4f, keep);
 
    for (size_t i = 0; i < keep.size(); i++)
-      keep[i].print();
+      std::cout << keep[i] << std::endl;
 }
 
 int 
@@ -183,4 +110,5 @@ main(int argc, char *argv[])
     test_nn();
     return 0;
 }
+#endif
 
