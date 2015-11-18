@@ -1,7 +1,6 @@
 #include <iostream>
 #include <opencv2/gpu/gpu.hpp>
 #include "caffeclassifier.h"
-#include "fast_nms.hpp"
 
 using namespace caffe;
 
@@ -48,26 +47,28 @@ CaffeClassifier::CaffeClassifier(const std::string& model_file,
       << "Number of labels is different from the output layer dimension.";
 }
 
-static bool PairCompare(const std::pair<float, int>& lhs,
-      const std::pair<float, int>& rhs) {
+static bool PairCompare(const std::pair<float, int>& lhs, const std::pair<float, int>& rhs) 
+{
    return lhs.first > rhs.first;
 }
 
 /* Return the indices of the top N values of vector v. */
-static std::vector<int> Argmax(const std::vector<float>& v, int N) {
+static std::vector<int> Argmax(const std::vector<float>& v, int N) 
+{
    std::vector<std::pair<float, int> > pairs;
    for (size_t i = 0; i < v.size(); ++i)
       pairs.push_back(std::make_pair(v[i], i));
    std::partial_sort(pairs.begin(), pairs.begin() + N, pairs.end(), PairCompare);
 
    std::vector<int> result;
-   for (int i = 0; i < N; ++i)
+   for (size_t i = 0; i < N; ++i)
       result.push_back(pairs[i].second);
    return result;
 }
 
 /* Return the top N predictions. */
-std::vector<Prediction> CaffeClassifier::Classify(const cv::Mat& img, int N) {
+std::vector<Prediction> CaffeClassifier::Classify(const cv::Mat& img, int N) 
+{
    std::vector<float> output = Predict(img);
 
    N = std::min<int>(labels_.size(), N);
@@ -121,7 +122,7 @@ void CaffeClassifier::WrapInputLayer(std::vector<cv::Mat>* input_channels) {
 }
 
 void CaffeClassifier::Preprocess(const cv::Mat& img,
-      std::vector<cv::Mat>* input_channels) {
+				 std::vector<cv::Mat>* input_channels) {
    /* Convert the input image to the input image format of the network. */
    cv::Mat sample;
    if (img.channels() == 3 && num_channels_ == 1)
@@ -160,14 +161,20 @@ void CaffeClassifier::Preprocess(const cv::Mat& img,
       << "Input channels are not wrapping the input layer of the network.";
 }
 
-std::vector< std::vector<Prediction> > CaffeClassifier::ClassifyBatch(const std::vector< cv::Mat > &imgs, int num_classes){
+std::vector< std::vector<Prediction> > CaffeClassifier::ClassifyBatch(const std::vector< cv::Mat > &imgs, 
+                                                                      size_t num_classes)
+{
    std::vector<float> output_batch = PredictBatch(imgs);
    std::vector< std::vector<Prediction> > predictions;
-   for(size_t j = 0; j < imgs.size(); j++){
-      std::vector<float> output(output_batch.begin() + j*num_classes, output_batch.begin() + (j+1)*num_classes);
+   size_t labels_size = labels_.size();
+   num_classes = std::min(num_classes, labels_size);
+   for(size_t j = 0; j < imgs.size(); j++)
+   {
+      std::vector<float> output(output_batch.begin() + j*labels_size, output_batch.begin() + (j+1)*labels_size);
       std::vector<int> maxN = Argmax(output, num_classes);
       std::vector<Prediction> prediction_single;
-      for (int i = 0; i < num_classes; ++i) {
+      for (size_t i = 0; i < num_classes; ++i) 
+      {
 	 int idx = maxN[i];
 	 prediction_single.push_back(std::make_pair(labels_[idx], output[idx]));
       }
@@ -190,7 +197,8 @@ void CaffeClassifier::SetMean(const std::string& mean_file) {
    /* The format of the mean file is planar 32-bit float BGR or grayscale. */
    std::vector<cv::Mat> channels;
    float* data = mean_blob.mutable_cpu_data();
-   for (int i = 0; i < num_channels_; ++i) {
+   for (int i = 0; i < num_channels_; ++i) 
+   {
       /* Extract an individual channel. */
       cv::Mat channel(mean_blob.height(), mean_blob.width(), CV_32FC1, data);
       channels.push_back(channel);
@@ -270,8 +278,10 @@ void CaffeClassifier::WrapBatchInputLayer(std::vector<std::vector<cv::Mat> > *in
 
 
 void CaffeClassifier::PreprocessBatch(const std::vector<cv::Mat> &imgs,
-      std::vector< std::vector<cv::Mat> >* input_batch){
-   for (int i = 0 ; i < imgs.size(); i++){
+      std::vector< std::vector<cv::Mat> >* input_batch)
+{
+   for (int i = 0 ; i < imgs.size(); i++)
+   {
       cv::Mat img = imgs[i];
       std::vector<cv::Mat> *input_channels = &(input_batch->at(i));
 
@@ -288,6 +298,7 @@ void CaffeClassifier::PreprocessBatch(const std::vector<cv::Mat> &imgs,
       else
 	 sample = img;
 
+#if 0
       cv::Mat sample_resized;
       if (sample.size() != input_geometry_)
 	 cv::resize(sample, sample_resized, input_geometry_);
@@ -299,9 +310,10 @@ void CaffeClassifier::PreprocessBatch(const std::vector<cv::Mat> &imgs,
 	 sample_resized.convertTo(sample_float, CV_32FC3);
       else
 	 sample_resized.convertTo(sample_float, CV_32FC1);
+#endif
 
       cv::Mat sample_normalized;
-      cv::subtract(sample_float, mean_, sample_normalized);
+      cv::subtract(sample, mean_, sample_normalized);
 
       /* This operation will write the separate BGR planes directly to the
        * input layer of the network because it is wrapped by the cv::Mat
@@ -319,132 +331,13 @@ size_t CaffeClassifier::BatchSize(void) const
    return batch_size_;
 }
 
-double gtod_wrapper(void)
+cv::Size CaffeClassifier::getInputGeometry(void) const
 {
-   struct timeval tv;
-   gettimeofday(&tv, NULL);
-   return (double)tv.tv_sec + (double)tv.tv_usec/1000000.0;
+   return input_geometry_;
 }
 
-int main(int argc, char *argv[])
+const cv::Mat CaffeClassifier::getMean(void) const
 {
-   if (argc != 6) 
-   {
-      std::cerr << "Usage: " << argv[0]
-	 << " deploy.prototxt network.caffemodel"
-	 << " mean.binaryproto labels.txt img.jpg" << std::endl;
-      return 1;
-   }
-   ::google::InitGoogleLogging(argv[0]);
-   std::string model_file   = argv[1];
-   std::string trained_file = argv[2];
-   std::string mean_file    = argv[3];
-   std::string label_file   = argv[4];
-   CaffeClassifier classifier(model_file, trained_file, mean_file, label_file, true, 20 );
-
-   std::string file = argv[5];
-   cv::Mat img = cv::imread(file, -1);
-   CHECK(!img.empty()) << "Unable to decode image " << file;
-
-   std::vector<cv::Mat> imgs;
-   std::vector<cv::Rect> rects;
-   cv::Mat imgCopy(img.clone());
-   typedef std::pair<cv::Rect, float> Detected;
-   std::vector<Detected> detected;
-
-   int size = 700;
-   int step = 6;
-   double start = gtod_wrapper();
-
-#if 0
-   size = 150;
-   rects.push_back(cv::Rect(72, 12, size, size));
-   imgs.push_back(img(rects[rects.size()-1]).clone());
-   rects.push_back(cv::Rect(72, 18, size,size));
-   imgs.push_back(img(rects[rects.size()-1]).clone());
-   size = 130;
-   rects.push_back(cv::Rect(78, 18, size,size));
-   imgs.push_back(img(rects[rects.size()-1]).clone());
-   std::vector <std::vector<Prediction> >predictions = classifier.ClassifyBatch(imgs, 6);
-   for (size_t i = 0; i < predictions.size(); ++i) 
-   {
-      for (size_t j = 0; j < predictions[i].size(); ++j) 
-      {
-	 Prediction p = predictions[i][j];
-	 std::cout << "i = " << i << " j = " << j << " " << rects[i] << " first = " << p.first << " second = " << p.second << std::endl;
-      }
-   }
-#else
-   int posCount = 0;
-   do
-   {
-      for (int c = 0; (c + size) < img.cols; c += step)
-      {
-	 for (int r = 0; (r + size) < img.rows; r +=step)
-	 {
-	    rects.push_back(cv::Rect(c, r, size, size));
-	    imgs.push_back(imgCopy(rects[rects.size() - 1]));
-	    if (imgs.size() == classifier.BatchSize())
-	    {
-	       std::vector <std::vector<Prediction> >predictions = classifier.ClassifyBatch(imgs, 6);
-	       std::cerr << ".";
-	       for (size_t i = 0; i < predictions.size(); ++i)
-	       {
-		  for (std::vector <Prediction>::const_iterator it = predictions[i].begin(); it != predictions[i].end(); ++it)
-		  {
-		     if (it->first == "bin") 
-		     {
-			if (it->second > 0.9)
-			{
-			   //stringstream s;
-			   //s << "falsepositive" << posCount++ << ".png";
-			   //imwrite(s.str().c_str(), imgCopy(rects[i]));
-			   detected.push_back(Detected(rects[i], it->second));
-			}
-			break;
-		     }
-		  }
-	       }
-	       imgs.clear();
-	       rects.clear();
-	    }
-	 }
-      }
-      size /= 1.15;
-   } while (size > 48);
-   double end = gtod_wrapper();
-   std::cout << "Elapsed time = " << (end - start) << std::endl;
-#endif
-
-   namedWindow("Image", cv::WINDOW_AUTOSIZE);
-   for (std::vector<Detected>::const_iterator it = detected.begin(); it != detected.end(); ++it)
-   {
-      std::cout << it->first << " " << it->second << std::endl;
-      rectangle(img, it->first, cv::Scalar(0,0,255));
-   }
-   std::vector<cv::Rect> filteredRects;
-   fastNMS(detected, 0.4f, filteredRects);
-   for (std::vector<cv::Rect>::const_iterator it = filteredRects.begin(); it != filteredRects.end(); ++it)
-   {
-      std::cout << *it << std::endl;
-      rectangle(img, *it, cv::Scalar(0,255,255));
-   }
-   imshow("Image", img);
-   cv::waitKey(0);
-   return 0;
-#if 0
-   std::cout << "---------- Prediction for " << file << " ----------" << std::endl;
-
-   std::vector<Prediction> predictions = classifier.Classify(img, 2);
-
-   std::cout <<  predictions.size() <<  std::endl;
-
-   /* Print the top N predictions. */
-   for (size_t i = 0; i < predictions.size(); ++i) {
-      Prediction p = predictions[i];
-      std::cout << std::fixed << std::setprecision(4) << p.second << " - \""
-	 << p.first << "\"" << std::endl;
-   }
-#endif
+   return mean_;
 }
 

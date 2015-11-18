@@ -24,8 +24,10 @@ class CaffeClassifier {
   std::vector<Prediction> Classify(const cv::Mat& img, int N = 5);
 
   void setBatchSize(size_t batch_size);
-  std::vector< std::vector<Prediction> > ClassifyBatch(const std::vector< cv::Mat > &imgs, int num_classes);
+  std::vector< std::vector<Prediction> > ClassifyBatch(const std::vector< cv::Mat > &imgs, size_t num_classes);
   size_t BatchSize(void) const;
+  cv::Size getInputGeometry(void) const;
+  const cv::Mat getMean(void) const;
  private:
   void SetMean(const std::string& mean_file);
 
