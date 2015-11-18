@@ -19,6 +19,7 @@ CaffeBatchPrediction
 CaffePrediction
 display
 opencv_createsamples_color
+scalefactor
 *.exe
 *.stackdump
 
