@@ -37,18 +37,17 @@ bool findRect(Mat &input, Rect &output, int HMin, int HMax, int SMin, int SMax, 
         vector<vector<Point> > contours;
         vector<Vec4i> hierarchy;
         vector<Point> points;
-        vector<Point> empty;
         findContours( btrack, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0) );
         int screenContour = -1;
         for( size_t i = 0; i < hierarchy.size(); i++ )
         {
-            if(hierarchy[i][3] >= 0 && boundingRect(contours[i]).area() > 500)
+            if(hierarchy[i][3] >= 0 && boundingRect(contours[i]).area() > 1000)
             {
                 points = contours[i];
                 break;
             }
         }
-        if(points == empty)
+        if(points.empty())
         {
             return false;
         }
@@ -83,11 +82,16 @@ bool resizeRect(Rect &theRect, float pMax, const Mat imageCool)
     //to image imageCool
     Point tl = theRect.tl();
     Point br = theRect.br();
-    int sanityCount = 0;
-    do {
+    if(tl.x < 0 || tl.y < 0 || br.x > imageCool.cols || br.y > imageCool.rows)
+    {
+        cout << "Rectangle out of bounds!";
+        return false;
+    }
+    tl = Point(-1,-1);
+    while (tl.x < 0 || tl.y < 0 || br.x > imageCool.cols || br.y > imageCool.rows)
+    {
         // Sanity check to make sure we don't get stuck in an infinite loop
         // in case we can't adjust the rectangle within the bounds of the Mat.
-        ++sanityCount;
         int intMax = int(pMax * 100 + .5);
         float adjust = rng.uniform(0,intMax);
         Size rectsize = theRect.size();
@@ -101,11 +105,6 @@ bool resizeRect(Rect &theRect, float pMax, const Mat imageCool)
         br = theRect.br();
         br.x = br.x + (width - rectsize.width)/2;
         br.y = br.y + (height - rectsize.height)/2;
-    }
-    while ((tl.x < 0 || tl.y < 0 || br.x > imageCool.cols || br.y > imageCool.rows) && sanityCount <= 9000);
-    if (sanityCount > 9000) {
-        cerr << "IT'S OVER 9000!!!" << endl;
-        return false;
     }
     theRect = Rect(tl, br);
     return true;
@@ -123,12 +122,13 @@ Mat rgbValThresh(int HMin,int HMax,int SMin,int SMax,int VMin, int VMax)
     int threshR = valR - color.at<cv::Vec3b>(0,0)[2];
     return (Mat_<cv::Vec3b>(1,2) << Vec3b(valB,valG,valR), Vec3b(threshB, threshG, threshR));
 }
-int main() {
+int main(int argc, char *argv[]) {
+    if(argc < 2)
+    {
+        cout << "usage: " << argv[0] << " <filename1 filename2 ...>" << endl;
+        return 0;
+    }
     namedWindow("Original", WINDOW_AUTOSIZE);
-    //namedWindow("Parameters",WINDOW_AUTOSIZE);
-    //namedWindow("Red", WINDOW_AUTOSIZE);
-    //namedWindow("Green", WINDOW_AUTOSIZE);
-    //namedWindow("Blue", WINDOW_AUTOSIZE);
     namedWindow("RangeControl", WINDOW_AUTOSIZE);
     namedWindow("Tracking", WINDOW_AUTOSIZE);
 
@@ -149,148 +149,108 @@ int main() {
     createTrackbar("HighEdge","Parameters", &highedge,2000);
 
     createTrackbar("Frequency","Parameters", &frequency,10);
-    VideoCapture inputVideo(0);
+    String vidName = "";
+    for(int i = 1; i < argc; i++)
+    {
+        vidName = argv[i];
+        cout << vidName;
+        VideoCapture inputVideo(vidName);
 
-    if(!inputVideo.isOpened())
-        cout << "Capture not open" << endl;
-
-    Mat input;
-    Mat hsvinput;
-
-    vector<Mat> channels;
-    vector<Mat> temp2(3);
-
-    int count = 0;
-    bool isColor = true;
-
-    Mat temp;
-    Mat hue;
-    Mat sat;
-    Mat val;
-    Mat rgbVal;
-
-    //inputVideo >> input;
-    rgbVal = rgbValThresh(HueMin, HueMax, SatMin, SatMax, ValMin, ValMax);
-    while(1) {
-        input = imread("/Users/benjamindecker/2015-Vision-Lab/grab_display/bin_chroma_edited.png",CV_LOAD_IMAGE_COLOR);
-        cvtColor( input, hsvinput, CV_BGR2HSV);
-        Mat zero = Mat::zeros(input.rows, input.cols, CV_8UC1);
-
-        //inputVideo >> input;
-        if(frequency == 0)
-            frequency = 1;
-        if(count % frequency == 0)
-            isColor = !isColor;
-        split(hsvinput, channels);
-
-
-        /* if(!isColor)
+        if(!inputVideo.isOpened())
         {
-        	temp = channels[2];
-        	channels[2] = channels[0];
-        	channels[0] = temp;
-        	merge(channels, input);
-        } */
+            cout << "Capture not open; invalid video" << endl;
+            continue;
+        }
 
+        Mat input;
+        Mat hsvinput;
 
+        vector<Mat> channels;
+        vector<Mat> temp2(3);
 
-        imshow("HSV", hsvinput);
-        /*
-        temp2[0] = channels[0];
-        temp2[1] = zero;
-        temp2[2] = zero;
-        merge(temp2, blue);
-        //imshow("Blue", blue);
+        int count = 0;
+        bool isColor = true;
 
-        temp2[0] = zero;
-        temp2[1] = channels[1];
-        merge(temp2, green);
-        //imshow("Green", green);
-
-        temp2[1] = zero;
-        temp2[2] = channels[2];
-        merge(temp2, red);
-        //imshow("Red", red);
-        */
-        vector<Mat> comp(3);
-
-
-        inRange(channels[0], HueMin, HueMax, comp[0]);
-        inRange(channels[1], SatMin, SatMax, comp[1]);
-        inRange(channels[2], ValMin, ValMax, comp[2]);
-
-        Mat btrack;
-
-        bitwise_and(comp[0], comp[1], btrack);
-        bitwise_and(btrack, comp[2], btrack);
-
-        int dilation_type = MORPH_RECT;
-
-
-        Mat element = getStructuringElement( dilation_type,
+        Mat temp;
+        Mat hue;
+        Mat sat;
+        Mat val;
+        Mat rgbVal;
+        Mat ret;
+        Mat frame;
+        Mat gframe;
+        Mat variancem;
+        Mat tempm;
+        float variance;
+    
+        rgbVal = rgbValThresh(HueMin, HueMax, SatMin, SatMax, ValMin, ValMax);
+        while(1) {
+            inputVideo >> frame;
+            if(frame.empty())
+            {
+                break;
+            }
+            cvtColor( frame, gframe, CV_BGR2GRAY);
+            Laplacian(gframe, temp, CV_8UC1);
+            meanStdDev(temp, tempm, variancem);
+            variance = pow(variancem.at<Scalar>(0,0)[0], 2);
+            cout << variance;
+            cvtColor( frame, hsvinput, CV_BGR2HSV);
+            input = frame;
+            Mat zero = Mat::zeros(input.rows, input.cols, CV_8UC1);
+            imshow("HSV", hsvinput);
+            Mat btrack;
+            inRange(hsvinput, Scalar(HueMin, SatMin, ValMin), Scalar(HueMax, SatMax, ValMax), btrack);
+            int dilation_type = MORPH_RECT;
+            Mat element = getStructuringElement( dilation_type,
                                              Size( 2*dilation_size + 1, 2*dilation_size+1 ),
                                              Point( dilation_size, dilation_size ) );
 
+            dilate(btrack, btrack, element);
+            imshow("Tracking", btrack);
 
-        dilate(btrack, btrack, element);
-        imshow("Tracking", btrack);
+            vector<vector<Point> > contours;
+            vector<Vec4i> hierarchy;
 
-        //BlueMax 73, BlueMin 0, RedMax 174, RedMin 127, GreenMax 75, GreenMin 0
+            /// Detect edges using canny
+            Canny(btrack, temp, lowedge, highedge, 3);
+            /// Find contours
+            findContours( temp, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0) );
+            vector<Moments> mu(contours.size() );
+            for( int i = 0; i < contours.size(); i++ )
+            {
+                mu[i] = moments( contours[i], false );
+            }
+            Rect boundRect;
+            bool exists;
+            exists = findRect(hsvinput, boundRect, HueMin, HueMax, SatMin, SatMax, ValMin, ValMax);
+            if(exists == false)
+            {
+                cout << "No rectangle found!";
+                continue;
+            }
+            boundRect = adjustRect(boundRect, 1.0);
+            exists = resizeRect(boundRect, .2, hsvinput);
+            if(exists == false)
+            {
+                cout << "Could not resize rectangle!";
+                continue;
+            }
 
+            ///  Get the mass centers:
+            vector<Point2f> mc( contours.size() );
+            for( int i = 0; i < contours.size(); i++ )
+            {
+                mc[i] = Point2f( mu[i].m10/mu[i].m00 , mu[i].m01/mu[i].m00 );
+            }
 
-        /* GaussianBlur(input, input, Size(9,9), myblur);
-        imshow("Blur", input); */
-        vector<vector<Point> > contours;
-        vector<Vec4i> hierarchy;
-
-        /// Detect edges using canny
-        Canny(btrack, temp, lowedge, highedge, 3);
-        /// Find contours
-        findContours( temp, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0) );
-        vector<Moments> mu(contours.size() );
-        for( int i = 0; i < contours.size(); i++ )
-        {
-            mu[i] = moments( contours[i], false );
+            /// Draw contours
+            Mat drawing = Mat::zeros( temp.size(), CV_8UC3 ); 
+            Scalar color = Scalar(0,0,0);
+            rectangle( input, boundRect, color ,2 );
+            imshow("Edges", input);
+            if(waitKey(1) >= 0) break;
         }
-        Rect boundRect;
-        bool exists;
-        exists = findRect(hsvinput, boundRect, HueMin, HueMax, SatMin, SatMax, ValMin, ValMax);
-        if(exists == false)
-        {
-            cout << "No rectangle found!";
-            continue;
-        }
-        boundRect = adjustRect(boundRect, 1.33);
-        exists = resizeRect(boundRect, .2, hsvinput);
-        if(exists == false)
-        {
-            cout << "Could not resize rectangle!";
-            continue;
-        }
-        Mat boundMat = input(boundRect).clone();
-        imshow("boundMat", boundMat);
-
-        ///  Get the mass centers:
-        vector<Point2f> mc( contours.size() );
-        for( int i = 0; i < contours.size(); i++ )
-        {
-            mc[i] = Point2f( mu[i].m10/mu[i].m00 , mu[i].m01/mu[i].m00 );
-        }
-
-        /// Draw contours
-        Mat drawing = Mat::zeros( temp.size(), CV_8UC3 );
-        for( int i = 0; i< contours.size(); i++ )
-        {
-            Scalar color = Scalar( rng.uniform(0, 255), rng.uniform(0,255), rng.uniform(0,255) );
-            //drawContours( input, contours, i, color, 2, 8, hierarchy, 0, Point() );
-            //circle( input, mc[i], 4, color, -1, 8, 0 );
-        }
-        Scalar color = Scalar( rng.uniform(0, 255), rng.uniform(0,255), rng.uniform(0,255) );
-        rectangle( input, boundRect, color ,2 );
-        //imshow("temp", temp);
-        imshow("Edges", input);
-        count++;
-        if(waitKey(5) >= 0) break;
     }
     return 0;
 }
