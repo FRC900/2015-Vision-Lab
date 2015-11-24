@@ -44,7 +44,6 @@
  *
  * support functions for training and test samples creation.
  */
-
 #include "cvhaartraining.h"
 #include "_cvhaartraining.h"
 
@@ -461,30 +460,48 @@ void icvRandomQuad( int width, int height, double quad[4][2],
 
 
 int icvStartSampleDistortion( const char* imgfilename, int bgcolor, int bgthreshold,
-                              CvSampleDistortionData* data, bool grayscale )
+                              CvSampleDistortionData* data, bool grayscale, bool hsv )
 {
+	if (grayscale && hsv)
+	   return 0;
     memset( data, 0, sizeof( *data ) );
     data->src = cvLoadImage( imgfilename, grayscale ? CV_LOAD_IMAGE_GRAYSCALE : CV_LOAD_IMAGE_COLOR );
     if( data->src != NULL && data->src->depth == IPL_DEPTH_8U )
     {
-        int r, c, n, m;
-        uchar* pmask;
-        uchar* psrc;
-        uchar* perode;
+        int r, c, n, m; // row, col, channel num
+        uchar* pmask;   // pointer to current mask pixel(s)
+        uchar* psrc;    // pointer to current source image pixel(s)
+        uchar* perode;  // pointer to erode and dialate pixels
         uchar* pdilate;
         uchar dd, de;
-	std::vector<int> bgcolors;
-	std::vector<int> bgthresholds;
+		std::vector<int> bgcolors;    
+		std::vector<int> bgthresholds;
+		IplImage *savedSrc = data->src;
+		IplImage *hsv;
 
-	/* convert bgcolor/bgthreshold into array of component BGR values */
-	for ( n = 0; n < data->src->nChannels; n++ )
-	{
-	    /* bgcolor / bgthreshold are 3 8-bit numbers in RGB format
-		 * pixels are stored in BGR. Make the bgcolors/bgthresholds
-		 * arrays store the values in that order too to make indexing easy */
-	    bgcolors.push_back    (((unsigned)bgcolor     >> (n * 8)) & 0xff);
-	    bgthresholds.push_back(((unsigned)bgthreshold >> (n * 8)) & 0xff);
-	}
+
+		/* convert bgcolor/bgthreshold into array of component BGR values */
+		for ( n = 0; n < data->src->nChannels; n++ )
+		{
+			/* bgcolor / bgthreshold are 3 8-bit numbers in RGB / HSV format
+			 * pixels are stored in BGR or HSV. Make the bgcolors/bgthresholds
+			 * arrays store the values in that order too to make indexing easy */
+		    bgcolors.push_back    (((unsigned)bgcolor     >> (n * 8)) & 0xff);
+		    bgthresholds.push_back(((unsigned)bgthreshold >> (n * 8)) & 0xff);
+		}
+		
+		if (hsv)
+		{
+		   // Above will create VSH - swap it to match HSV pixel alignment
+		   std::swap(bgcolors[0], bgcolors[2]);
+		   std::swap(bgthresholds[0], bgthresholds[2]);
+
+		   // Create hsv image, temporarily set ->src to it
+		   // ->src will be restored at the end of the function
+		   hsv = cvCloneImage( data->src );
+		   cvCvtColor( data->src, hsv, CV_BGR2HSV );
+		   data->src = hsv;
+		}
 
         data->dx = data->src->width / 2;
         data->dy = data->src->height / 2;
@@ -506,15 +523,15 @@ int icvStartSampleDistortion( const char* imgfilename, int bgcolor, int bgthresh
 				/* Assume sample will be masked off. If any of the channels
 				   falls out of range of the mask for that channel, update
 				   the pixel to be unmasked and bail out of the loop */
-		*pmask = (uchar)0;
-		for ( n = 0; n < data->src->nChannels; n++ )
-		{
-		   if( !(bgcolors[n] - bgthresholds[n] <= (int) psrc[n] &&
-		       (int) psrc[n] <= bgcolors[n] + bgthresholds[n] ) )
-		   {
-		       *pmask = (uchar) 255;
-		       break;
-		   }
+				*pmask = (uchar)0;
+				for ( n = 0; n < data->src->nChannels; n++ )
+				{
+		 			if( !(bgcolors[n] - bgthresholds[n] <= (int) psrc[n] &&
+	     				(int) psrc[n] <= bgcolors[n] + bgthresholds[n] ) )
+	   				{
+	       				*pmask = (uchar) 255;
+	       				break;
+	   				}
                 }
             }
         }
@@ -538,24 +555,30 @@ int icvStartSampleDistortion( const char* imgfilename, int bgcolor, int bgthresh
                     pdilate =
                         ( (uchar*)(data->dilate->imageData + r * data->dilate->widthStep)
                                 + c * data->dilate->nChannels );
-		    for ( n = 0; n > data->src->nChannels; n++ )
-		    { 
-		       de = (uchar)(bgcolors[n] - perode[n]);
-		       dd = (uchar)(pdilate[n] - bgcolors[n]);
-		       if( de >= dd && de > bgthresholds[n] )
-		       {
-			   for ( m = 0; m < data->src->nChannels; m++ )
-			       psrc[m] = perode[m];
-		       }
-		       if( dd > de && dd > bgthresholds[n] )
-		       {
-			   for ( m = 0; m < data->src->nChannels; m++ )
-			       psrc[m] = pdilate[m];
-		       }
-                    }
+					for ( n = 0; n > data->src->nChannels; n++ )
+					{ 
+						de = (uchar)(bgcolors[n] - perode[n]);
+						dd = (uchar)(pdilate[n] - bgcolors[n]);
+						if( de >= dd && de > bgthresholds[n] )
+						{
+							for ( m = 0; m < data->src->nChannels; m++ )
+							psrc[m] = perode[m];
+						}
+						if( dd > de && dd > bgthresholds[n] )
+						{
+							for ( m = 0; m < data->src->nChannels; m++ )
+							psrc[m] = pdilate[m];
+						}
+					}
                 }
             }
         }
+
+		if (hsv)
+		{
+		   data->src  = savedSrc;
+		   cvReleaseImage( &hsv );
+		}
 
         data->img     = cvCreateImage( cvSize( data->src->width + 2 * data->dx,
                                                data->src->height + 2 * data->dy ),
@@ -563,6 +586,7 @@ int icvStartSampleDistortion( const char* imgfilename, int bgcolor, int bgthresh
         data->maskimg = cvCreateImage( cvSize( data->src->width + 2 * data->dx,
                                                data->src->height + 2 * data->dy ),
                                        IPL_DEPTH_8U, 1 );
+
 
         return 1;
     }
@@ -625,9 +649,7 @@ void icvPlaceDistortedSample( CvArr* background,
 		cvSplit( data->src, src_split[0], src_split[1], src_split[2], NULL ); // BGR
 
         for ( i = 0; i < 3; i++ )
-		{
 			cvWarpPerspective( src_split[i], img_arr[i], quad );
-		}
 		cvMerge( img_arr[0], img_arr[1], img_arr[2], NULL, data->img );
 		for ( i = 0; i < 3; i++ )
 		{

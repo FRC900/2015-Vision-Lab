@@ -323,7 +323,7 @@ void icvPlaceDistortedSample( CvArr* background,
 void icvEndSampleDistortion( CvSampleDistortionData* data );
 
 int icvStartSampleDistortion( const char* imgfilename, int bgcolor, int bgthreshold,
-                              CvSampleDistortionData* data, bool grayscale = true );
+                              CvSampleDistortionData* data, bool grayscale = true, bool hsv = false );
 
 typedef int (*CvGetHaarTrainingDataCallback)( CvMat* img, void* userdata );
 

@@ -2966,7 +2966,7 @@ void cvCreatePNGTrainingSamples( const char* pngfnformat,
                                  const char* bgfilename, int count,
                                  int invert, int maxintensitydev,
                                  double maxxangle, double maxyangle, double maxzangle,
-                                 bool showsamples,
+                                 bool showsamples, bool hsv,
                                  int winwidth, int winheight )
 {
     CvSampleDistortionData data;
@@ -2981,7 +2981,7 @@ void cvCreatePNGTrainingSamples( const char* pngfnformat,
         fprintf( stderr, "Unable to create output file: %s\n", fullname);
         return;
     }
-    if( icvStartSampleDistortion( imgfilename, bgcolor, bgthreshold, &data, false ) )
+    if( icvStartSampleDistortion( imgfilename, bgcolor, bgthreshold, &data, false, hsv ) )
     {
         int inverse  = invert;
         int hasbg    = icvInitBackgroundReaders( bgfilename, cvSize( winwidth,winheight ), CV_8UC3 );

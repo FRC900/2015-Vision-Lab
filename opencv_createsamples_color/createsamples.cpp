@@ -67,10 +67,14 @@ int main( int argc, char* argv[] )
     char* bgfilename = NULL; /* background */
     char* pngfnformat  = NULL; /* PNG file name format string */
     int num = 1000;
+    // Background mask color and threshold
     int bgcolor = 0;
     int bgthreshold = 80;
+    bool hsv = false; // filter in HSV when true, BGR when false
+    // Intensity variatoins 
     int invert = 0;
     int maxintensitydev = 40;
+    // Rotation angles
     double maxxangle = 1.1;
     double maxyangle = 1.1;
     double maxzangle = 0.5;
@@ -89,8 +93,9 @@ int main( int argc, char* argv[] )
                 "  [-img <image_file_name>]\n"
                 "  [-vec <vec_file_name>]\n"
                 "  [-bg <background_file_name>]\n  [-num <number_of_samples = %d>]\n"
-                "  [-bgcolor <background_color = %d>]\n"
-                "  [-inv] [-randinv] [-bgthresh <background_color_threshold = %d>]\n"
+                "  [-bgcolor <background_color = %d>] [-bgthresh <background_color_threshold = %d>]\n"
+		"  [-hsv]\n"
+                "  [-inv] [-randinv]\n" 
                 "  [-maxidev <max_intensity_deviation = %d>]\n"
                 "  [-maxxangle <max_x_rotation_angle = %f>]\n"
                 "  [-maxyangle <max_y_rotation_angle = %f>]\n"
@@ -133,6 +138,10 @@ int main( int argc, char* argv[] )
         else if( !strcmp( argv[i], "-bgthresh" ) )
         {
             bgthreshold = strtoul( argv[++i], NULL, 0 );
+        }
+        else if( !strcmp( argv[i], "-hsv" ) )
+        {
+            hsv = true;
         }
         else if( !strcmp( argv[i], "-inv" ) )
         {
@@ -232,7 +241,7 @@ int main( int argc, char* argv[] )
         cvCreatePNGTrainingSamples ( pngfnformat, imagename, bgcolor, bgthreshold, bgfilename,
                                      num, invert, maxintensitydev,
                                      maxxangle, maxyangle, maxzangle,
-                                     showsamples, width, height );
+                                     showsamples, hsv, width, height );
 
         printf( "Done\n" );
     }

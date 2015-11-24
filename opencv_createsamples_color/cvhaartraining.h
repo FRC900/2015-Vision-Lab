@@ -97,6 +97,7 @@ void cvCreatePNGTrainingSamples(const char* pngfnformat,
                                 double maxyangle = 1.1,
                                 double maxzangle = 0.5,
                                 bool showsamples = false,
+                                bool hsv         = false,
                                 int winwidth = 24, int winheight = 24 );
 
 void cvCreatePngTrainingSet(const char* imgfilename, int bgcolor, int bgthreshold,
