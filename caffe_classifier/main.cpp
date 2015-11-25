@@ -1,5 +1,5 @@
 #include <iostream>
-#include "caffeclassifier.h"
+#include "CaffeBatchPrediction.hpp"
 #include "scalefactor.hpp"
 #include "fast_nms.hpp"
 
@@ -10,7 +10,7 @@ double gtod_wrapper(void)
    return (double)tv.tv_sec + (double)tv.tv_usec/1000000.0;
 }
 
-void doBatchPrediction(const std::vector<cv::Mat> &imgs, const std::vector<cv::Rect> &rects, std::vector<Detected> &detected);
+void doBatchPrediction(CaffeClassifier &classifier, const std::vector<cv::Mat> &imgs, const std::vector<cv::Rect> &rects, float scale, std::vector<Detected> &detected);
 
 int main(int argc, char *argv[])
 {
@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
    std::string trained_file = argv[2];
    std::string mean_file    = argv[3];
    std::string label_file   = argv[4];
-   CaffeClassifier classifier(model_file, trained_file, mean_file, label_file, true, 3 );
+   CaffeClassifier classifier(model_file, trained_file, mean_file, label_file, false, 64 );
 
    std::string file = argv[5];
    cv::Mat img = cv::imread(file, -1);
@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
 	    // If batch_size images are collected, run the detection code
 	    if (imgs.size() == classifier.BatchSize())
 	    {
-	       doBatchPrediction(imgs, rects, detected);
+	       doBatchPrediction(classifier, imgs, rects, scales[scale], detected);
 	       // Reset image list
 	       imgs.clear();
 	       rects.clear();
@@ -109,7 +109,7 @@ int main(int argc, char *argv[])
       // Finish up any left-over detection windows for this scaled image
       if (rects.size())
       {
-	 doBatchPrediction(imgs, rects, detected);
+	 doBatchPrediction(classifier, imgs, rects, scales[scale], detected);
 	 imgs.clear();
 	 rects.clear();
       }
@@ -140,7 +140,7 @@ int main(int argc, char *argv[])
 
 // do 1 run of the classifier. This takes up batch_size predictions and adds anything found
 // to the detected list
-void doBatchPrediction(const std::vector<cv::Mat> &imgs, const std::vector<cv::Rect> &rects, std::vector<Detected> &detected)
+void doBatchPrediction(CaffeClassifier &classifier, const std::vector<cv::Mat> &imgs, const std::vector<cv::Rect> &rects, float scale, std::vector<Detected> &detected)
 {
    std::vector <std::vector<Prediction> >predictions = classifier.ClassifyBatch(imgs, 1);
    // Each outer loop is the predictions for one input image
@@ -166,8 +166,8 @@ void doBatchPrediction(const std::vector<cv::Mat> &imgs, const std::vector<cv::R
 #endif
 	       // If found, create a detect rect scaled back to fit correctly
 	       // on the original image, add it to the list of detections
-	       cv::Rect dr(rects[i].x / scales[scale], rects[i].y / scales[scale],
-		     rects[i].width / scales[scale], rects[i].height / scales[scale]);
+	       cv::Rect dr(rects[i].x / scale, rects[i].y / scale,
+		     rects[i].width / scale, rects[i].height / scale);
 	       detected.push_back(Detected(dr, it->second));
 	    }
 	    break;

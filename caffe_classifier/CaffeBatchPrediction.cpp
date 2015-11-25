@@ -238,7 +238,7 @@ void CaffeClassifier::WrapBatchInputLayer(std::vector<std::vector<cv::Mat> > &in
 	 input_channels.push_back(channel);
 	 input_data += width * height;
       }
-      input_batch->push_back(std::vector<cv::Mat>(input_channels));
+      input_batch.push_back(std::vector<cv::Mat>(input_channels));
    }
 }
 
@@ -253,7 +253,7 @@ void CaffeClassifier::PreprocessBatch(const std::vector<cv::Mat> &imgs,
    for (int i = 0 ; i < imgs.size(); i++)
    {
       cv::Mat img = imgs[i];
-      std::vector<cv::Mat> *input_channels = &(input_batch->at(i));
+      std::vector<cv::Mat> *input_channels = &input_batch.at(i);
 
       /* Convert the input image to the input image format of the network. */
       cv::Mat sample;
