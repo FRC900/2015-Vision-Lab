@@ -21,10 +21,6 @@ class CaffeClassifier {
              const bool use_GPU,
              const int batch_size);
 
-  // Given an input image, return the N predictions with the highest
-  // confidences
-  std::vector<Prediction> Classify(const cv::Mat& img, int N = 5);
-
   // Given X input images, return X vectors of predictions.
   // Each of the X vectors are themselves a vector which will have the 
   // N predictions with the highest confidences for the corresponding
@@ -42,24 +38,6 @@ class CaffeClassifier {
   const cv::Mat getMean(void) const;
  private:
   void SetMean(const std::string& mean_file);
-
-  // Get the output values for a given image
-  // These values will be in the same order as the labels
-  // That is, [0] = value for label 0 and so on
-  std::vector<float> Predict(const cv::Mat& img);
-
-  // Wrap input layer of the net into separate Mat objects
-  // This sets them up to be written with actual data
-  // in Preprocess()
-  void WrapInputLayer(std::vector<cv::Mat>& input_channels);
-
-  // Take image in Mat, convert it to the correct image type,
-  // color depth, size to match the net input. Convert to 
-  // F32 type, since that's what the net inputs are. 
-  // Subtract out the mean before passing to the net input
-  // Then actually write the image to the net input memory buffers
-  void Preprocess(const cv::Mat& img,
-                  std::vector<cv::Mat>& input_channels);
 
   void reshapeNet(void);
 
