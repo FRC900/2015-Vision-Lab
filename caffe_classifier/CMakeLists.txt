@@ -11,18 +11,10 @@ find_package( CUDA REQUIRED )
 find_package( Boost COMPONENTS system REQUIRED )
 include_directories( ${OpenCV_INCLUDE_DIRS} /home/kjaget/caffe_bvlc/caffe/install/include ${Boost_INCLUDE_DIR} ../nonmax_suppression "../Scale Factor" )
 
-if (Boost_FOUND)
-else()
-   
-endif()
-
 find_library (LibCaffe caffe PATH  /home/kjaget/caffe_bvlc/caffe/install/lib )
 find_library (LibProto proto PATH  /home/kjaget/caffe_bvlc/caffe/install/lib )
 find_library (LibGLOG  glog)
 find_library (LibProtobuf protobuf)
-
-cuda_add_executable( CaffePrediction classification.cpp )
-target_link_libraries( CaffePrediction ${OpenCV_LIBS} ${LibCaffe} ${LibProto} ${Boost_LIBRARIES} ${LibGLOG} ${LibProtobuf} )
 
 cuda_add_executable( CaffeBatchPrediction CaffeBatchPrediction.cpp ../nonmax_suppression/fast_nms.cpp main.cpp "../Scale Factor/scalefactor.cpp" )
 target_link_libraries( CaffeBatchPrediction ${OpenCV_LIBS} ${LibCaffe} ${LibProto} ${Boost_LIBRARIES} ${LibGLOG} ${LibProtobuf} )
