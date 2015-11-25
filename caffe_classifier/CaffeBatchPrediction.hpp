@@ -30,12 +30,15 @@ class CaffeClassifier {
   // Get the width and height of an input image to the net
   cv::Size getInputGeometry(void) const;
 
-  // Change the batch size of the model
+  // Get the batch size of the model
   size_t BatchSize(void) const;
+
+  // Change the batch size of the model on the fly
   void setBatchSize(size_t batch_size);
 
   // Get an image with the mean value of all of the training images
   const cv::Mat getMean(void) const;
+
  private:
   void SetMean(const std::string& mean_file);
 
@@ -53,22 +56,21 @@ class CaffeClassifier {
   // Wrap input layer of the net into separate Mat objects
   // This sets them up to be written with actual data
   // in PreprocessBatch()
-  void WrapBatchInputLayer(std::vector<std::vector<cv::Mat> > &input_batch);
+  void WrapBatchInputLayer(void);
 
   // Take each image in Mat, convert it to the correct image type,
   // color depth, size to match the net input. Convert to 
   // F32 type, since that's what the net inputs are. 
   // Subtract out the mean before passing to the net input
   // Then actually write the images to the net input memory buffers
-  void PreprocessBatch(const std::vector<cv::Mat> &imgs,
-                             std::vector< std::vector<cv::Mat> > &input_batch);
+  void PreprocessBatch(const std::vector<cv::Mat> &imgs);
 
- private:
   std::shared_ptr<caffe::Net<float> > net_; // the net itself
   cv::Size input_geometry_;         // size of one input image
   int num_channels_;                // num color channels per input image
   size_t batch_size_;               // number of images to process in one go
   cv::Mat mean_;                    // mean value of input images
   std::vector<std::string> labels_; // labels for each output value
+  std::vector< std::vector<cv::Mat> > input_batch; // net input buffers wrapped in Mat's
 };
 #endif

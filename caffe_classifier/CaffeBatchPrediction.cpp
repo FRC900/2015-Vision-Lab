@@ -47,6 +47,24 @@ CaffeClassifier::CaffeClassifier(const std::string& model_file,
    Blob<float>* output_layer = net_->output_blobs()[0];
    CHECK_EQ(labels_.size(), output_layer->channels())
       << "Number of labels is different from the output layer dimension.";
+
+   // Pre-process Mat wrapping
+   input_layer->Reshape(batch_size_, num_channels_,
+	 input_geometry_.height,
+	 input_geometry_.width);
+
+   /* Forward dimension change to all layers. */
+   net_->Reshape();
+
+   // The wrap code puts the buffer for one individual channel
+   // input to the net (one color channel of one image) into 
+   // a separate Mat 
+   // The inner vector here will be one Mat per channel of the 
+   // input to the net. The outer vector is a vector of those
+   // one for each of the batched inputs.
+   // This allows an easy copy from the input images
+   // into the input buffers for the net
+   WrapBatchInputLayer();
 }
 
 // Helper function for compare - used to sort values by pair.first keys
@@ -156,10 +174,6 @@ void CaffeClassifier::setBatchSize(size_t batch_size)
    reshapeNet();
 }
 
-// TODO : see if we can do this once at startup or if
-// it has to be done each pass.  If it can be done once,
-// we can wrap the nets in Mat arrays in the constructor 
-// and re-use them multiple times?
 void CaffeClassifier::reshapeNet() 
 {
    CHECK(net_->input_blobs().size() == 1);
@@ -168,6 +182,7 @@ void CaffeClassifier::reshapeNet()
 	 input_geometry_.height,
 	 input_geometry_.width);
    net_->Reshape();
+   WrapBatchInputLayer();
 }
 
 // Get the output values for a set of images in one flat vector
@@ -177,32 +192,12 @@ void CaffeClassifier::reshapeNet()
 // That is, [0] = value for label 0 for the first image up to 
 // [n] = value for label n for the first image. It then starts again
 // for the next image - [n+1] = label 0 for image #2.
-std::vector< float >  CaffeClassifier::PredictBatch(const std::vector< cv::Mat > &imgs) 
+std::vector<float> CaffeClassifier::PredictBatch(const std::vector<cv::Mat> &imgs) 
 {
-   Blob<float>* input_layer = net_->input_blobs()[0];
-
-   input_layer->Reshape(batch_size_, num_channels_,
-	 input_geometry_.height,
-	 input_geometry_.width);
-
-   /* Forward dimension change to all layers. */
-   net_->Reshape();
-
-   // The wrap code puts the buffer for one individual channel
-   // input to the net (one color channel of one image) into 
-   // a separate Mat 
-   // The inner vector here will be one Mat per channel of the 
-   // input to the net. The outer vector is a vector of those
-   // one for each of the batched inputs.
-   // This allows an easy copy from the input images
-   // into the input buffers for the net
-   std::vector< std::vector<cv::Mat> > input_batch;
-   WrapBatchInputLayer(input_batch);
-
    // Process each image so they match the format
    // expected by the net, then copy the images
    // into the net's input buffers
-   PreprocessBatch(imgs, input_batch);
+   PreprocessBatch(imgs);
 
    // Run a forward pass with the data filled in from above
    net_->ForwardPrefilled();
@@ -218,10 +213,8 @@ std::vector< float >  CaffeClassifier::PredictBatch(const std::vector< cv::Mat >
 // Wrap input layer of the net into separate Mat objects
 // This sets them up to be written with actual data
 // in PreprocessBatch()
-// TODO : see if this can be done once, or at the worst
-// once every time the batch size changes instead of
-// for every single batch we need to process
-void CaffeClassifier::WrapBatchInputLayer(std::vector<std::vector<cv::Mat> > &input_batch)
+// TODO : handle 
+void CaffeClassifier::WrapBatchInputLayer(void)
 {
    Blob<float>* input_layer = net_->input_blobs()[0];
 
@@ -229,6 +222,7 @@ void CaffeClassifier::WrapBatchInputLayer(std::vector<std::vector<cv::Mat> > &in
    int height = input_layer->height();
    int num = input_layer->num();
    float* input_data = input_layer->mutable_cpu_data();
+   input_batch.clear();
    for ( int j = 0; j < num; j++)
    {
       std::vector<cv::Mat> input_channels;
@@ -247,8 +241,7 @@ void CaffeClassifier::WrapBatchInputLayer(std::vector<std::vector<cv::Mat> > &in
 // F32 type, since that's what the net inputs are. 
 // Subtract out the mean before passing to the net input
 // Then actually write the images to the net input memory buffers
-void CaffeClassifier::PreprocessBatch(const std::vector<cv::Mat> &imgs,
-      std::vector< std::vector<cv::Mat> > &input_batch)
+void CaffeClassifier::PreprocessBatch(const std::vector<cv::Mat> &imgs)
 {
    for (int i = 0 ; i < imgs.size(); i++)
    {
