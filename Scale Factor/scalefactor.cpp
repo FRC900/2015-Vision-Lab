@@ -1,12 +1,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
-#include "scalefactor.hpp"
 
-#include <iostream>
-
-using namespace std;
-using namespace cv;
-
-void scalefactor(Mat inputimage, Size objectsize, Size minsize, Size maxsize, float scaleFactor, vector<Mat> &images, vector<float> &scales) 
+template<class MatT>
+void scalefactor(MatT inputimage, cv::Size objectsize, cv::Size minsize, cv::Size maxsize, float scaleFactor, std::vector<MatT> &images, std::vector<float> &scales) 
 {
 	images.clear(); 
 	scales.clear();
@@ -25,8 +20,8 @@ void scalefactor(Mat inputimage, Size objectsize, Size minsize, Size maxsize, fl
 	{	
 		//set objectsize.width to scalefactor * objectsize.width
 		//set objectsize.height to scalefactor * objectsize.height
-		Mat outputimage;
-		resize(inputimage, outputimage, Size(), scale, scale);
+		MatT outputimage;
+		resize(inputimage, outputimage, cv::Size(), scale, scale);
 		
 		images.push_back(outputimage);
 		scales.push_back(scale);
@@ -34,6 +29,4 @@ void scalefactor(Mat inputimage, Size objectsize, Size minsize, Size maxsize, fl
 		scale /= scaleFactor;		
 	
 	}	
-
 }
-

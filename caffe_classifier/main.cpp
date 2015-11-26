@@ -3,14 +3,28 @@
 #include "scalefactor.hpp"
 #include "fast_nms.hpp"
 
-double gtod_wrapper(void)
+#include <opencv2/highgui/highgui.hpp>
+
+static double gtod_wrapper(void)
 {
    struct timeval tv;
    gettimeofday(&tv, NULL);
    return (double)tv.tv_sec + (double)tv.tv_usec/1000000.0;
 }
 
-void doBatchPrediction(CaffeClassifier &classifier, const std::vector<cv::Mat> &imgs, const std::vector<cv::Rect> &rects, float scale, std::vector<Detected> &detected);
+// TODO :: can we keep output data in GPU as well?
+template <class MatT>
+void doBatchPrediction(CaffeClassifier<MatT> &classifier, 
+      const std::vector<MatT> &imgs, 
+      const std::vector<cv::Rect> &rects, 
+      float scale, 
+      std::vector<Detected> &detected);
+template <class MatT>
+void detectMultiscale(CaffeClassifier<MatT> &classifier, 
+      const cv::Mat &input, 
+      const cv::Size &minSize, 
+      const cv::Size &maxSize, 
+      std::vector<Detected> &detected);
 
 int main(int argc, char *argv[])
 {
@@ -26,21 +40,60 @@ int main(int argc, char *argv[])
    std::string trained_file = argv[2];
    std::string mean_file    = argv[3];
    std::string label_file   = argv[4];
-   CaffeClassifier classifier(model_file, trained_file, mean_file, label_file, false, 64 );
+   CaffeClassifier <cv::Mat> classifier(model_file, trained_file, mean_file, label_file, 64 );
+   //CaffeClassifier <cv::gpu::GpuMat> classifier(model_file, trained_file, mean_file, label_file, 64 );
 
    std::string file = argv[5];
-   cv::Mat img = cv::imread(file, -1);
-   CHECK(!img.empty()) << "Unable to decode image " << file;
+   cv::Mat inputImg = cv::imread(file, -1);
+   CHECK(!inputImg.empty()) << "Unable to decode image " << file;
 
-   // Simple multi-scale detect.  Take a single image, scale it into a number
-   // of diffent sized images. Run a fixed-size detection window across each
-   // of them.  Keep track of the scale of each scaled image to map the
-   // detected rectangles back to the correct location and size on the
-   // original input images
+   // min and max size of object we're looking for.  The input
+   // image will be scaled so that these min and max sizes
+   // line up with the classifier input size.  Other scales will
+   // fill in the range between those two end points.
+   cv::Size minSize(100,100);
+   cv::Size maxSize(700,700);
+
+   std::vector<Detected> detected; // list of detected rects & confidence values
+
+   detectMultiscale(classifier, inputImg, minSize, maxSize, detected);
+#if 1
+   namedWindow("Image", cv::WINDOW_AUTOSIZE);
+   for (std::vector<Detected>::const_iterator it = detected.begin(); it != detected.end(); ++it)
+   {
+      std::cout << it->first << " " << it->second << std::endl;
+      rectangle(inputImg, it->first, cv::Scalar(0,0,255));
+   }
+   std::vector<cv::Rect> filteredRects;
+   fastNMS(detected, 0.4f, filteredRects); 
+   for (std::vector<cv::Rect>::const_iterator it = filteredRects.begin(); it != filteredRects.end(); ++it)
+   {
+      std::cout << *it << std::endl;
+      rectangle(inputImg, *it, cv::Scalar(0,255,255));
+   }
+   imshow("Image", inputImg);
+   imwrite("detect.png", inputImg);
+   cv::waitKey(0);
+#endif
+   return 0;
+}
+
+// Simple multi-scale detect.  Take a single image, scale it into a number
+// of diffent sized images. Run a fixed-size detection window across each
+// of them.  Keep track of the scale of each scaled image to map the
+// detected rectangles back to the correct location and size on the
+// original input images
+template <class MatT>
+void detectMultiscale(CaffeClassifier<MatT> &classifier, 
+      const cv::Mat  &input, 
+      const cv::Size &minSize, 
+      const cv::Size &maxSize, 
+      std::vector<Detected> &detected)
+{
 
    // List of scaled images and the corresponding resize scale
    // used to create it. TODO : redo as a std::pair?
-   std::vector<cv::Mat> scaledImages;
+   std::vector<MatT> scaledImages;
    std::vector<float> scales;
 
    // The detector can take a batch of input images
@@ -48,19 +101,11 @@ int main(int argc, char *argv[])
    // and the location on the full image they came from.
    // When enough are collected, run the whole batch through
    // the detectora in one batch
-   std::vector<cv::Mat> imgs;    // input sub-images for this batch
+   // TODO : should probably also be redone as a std::pair
+   std::vector<MatT> imgs;    // input sub-images for this batch
    std::vector<cv::Rect> rects;  // where those sub-images came from
-                                 // in the full input image
+				 // in the full input image
 
-   std::vector<Detected> detected; // list of detected rects & confidence values
-
-   // min and max size of object we're looking for.  Also, the 
-   // fixed input size of the classifier itself.  The input
-   // image will be scaled so that these min and max sizes
-   // line up with the classifier input size.  Other scales will
-   // fill in the range between those two end points.
-   cv::Size minSize(100,100);
-   cv::Size maxSize(700,700);
    const cv::Size classifierSize = classifier.getInputGeometry();
 
    // How many pixels to move the window for each step
@@ -78,9 +123,9 @@ int main(int argc, char *argv[])
    // The net expects each pixel to be 3x 32-bit floating point
    // values. Convert it once here rather than later for every
    // individual input image.
-   cv::Mat f32Img;
-   img.convertTo(f32Img, CV_32FC3);
-   
+   MatT f32Img;
+   input.convertTo(f32Img, CV_32FC3);
+
    // Create array of scaled images
    scalefactor(f32Img, classifierSize, minSize, maxSize, 1.35, scaledImages, scales);
 
@@ -89,7 +134,7 @@ int main(int argc, char *argv[])
    {
       // Start at the upper left corner.  Loop through the rows and cols until
       // the detection window falls off the edges of the scaled image
-      for (int r = 0; (r + classifierSize.height) < scaledImages[scale].rows; r +=step)
+      for (int r = 0; (r + classifierSize.height) < scaledImages[scale].rows; r += step)
       {
 	 for (int c = 0; (c + classifierSize.width) < scaledImages[scale].cols; c += step)
 	 {
@@ -116,31 +161,16 @@ int main(int argc, char *argv[])
    } 
    double end = gtod_wrapper();
    std::cout << "Elapsed time = " << (end - start) << std::endl;
-
-#if 1
-   namedWindow("Image", cv::WINDOW_AUTOSIZE);
-   for (std::vector<Detected>::const_iterator it = detected.begin(); it != detected.end(); ++it)
-   {
-      std::cout << it->first << " " << it->second << std::endl;
-      rectangle(img, it->first, cv::Scalar(0,0,255));
-   }
-   std::vector<cv::Rect> filteredRects;
-   fastNMS(detected, 0.4f, filteredRects); 
-   for (std::vector<cv::Rect>::const_iterator it = filteredRects.begin(); it != filteredRects.end(); ++it)
-   {
-      std::cout << *it << std::endl;
-      rectangle(img, *it, cv::Scalar(0,255,255));
-   }
-   imshow("Image", img);
-   imwrite("detect.png", img);
-   cv::waitKey(0);
-#endif
-   return 0;
 }
 
 // do 1 run of the classifier. This takes up batch_size predictions and adds anything found
 // to the detected list
-void doBatchPrediction(CaffeClassifier &classifier, const std::vector<cv::Mat> &imgs, const std::vector<cv::Rect> &rects, float scale, std::vector<Detected> &detected)
+template <class MatT>
+void doBatchPrediction(CaffeClassifier<MatT> &classifier, 
+      const std::vector<MatT> &imgs, 
+      const std::vector<cv::Rect> &rects, 
+      float scale, 
+      std::vector<Detected> &detected)
 {
    std::vector <std::vector<Prediction> >predictions = classifier.ClassifyBatch(imgs, 1);
    // Each outer loop is the predictions for one input image

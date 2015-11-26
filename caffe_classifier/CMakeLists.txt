@@ -16,5 +16,5 @@ find_library (LibProto proto PATH  /home/kjaget/caffe_bvlc/caffe/install/lib )
 find_library (LibGLOG  glog)
 find_library (LibProtobuf protobuf)
 
-cuda_add_executable( CaffeBatchPrediction CaffeBatchPrediction.cpp ../nonmax_suppression/fast_nms.cpp main.cpp "../Scale Factor/scalefactor.cpp" )
+cuda_add_executable( CaffeBatchPrediction ../nonmax_suppression/fast_nms.cpp main.cpp )
 target_link_libraries( CaffeBatchPrediction ${OpenCV_LIBS} ${LibCaffe} ${LibProto} ${Boost_LIBRARIES} ${LibGLOG} ${LibProtobuf} )
