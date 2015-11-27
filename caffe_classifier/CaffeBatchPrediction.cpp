@@ -327,6 +327,9 @@ const MatT CaffeClassifier<MatT>::getMean(void) const
    return mean_;
 }
 
+// TODO : maybe don't specialize this one in case
+// we use something other than Mat or GpuMat in the
+// future?
 template <> template <>
 float *CaffeClassifier<cv::Mat>::GetBlobData(caffe::Blob<float> *blob)
 {
@@ -339,6 +342,9 @@ float *CaffeClassifier<cv::gpu::GpuMat>::GetBlobData(caffe::Blob<float> *blob)
    return blob->mutable_gpu_data();
 }
 
+// TODO : maybe don't specialize this one in case
+// we use something other than Mat or GpuMat in the
+// future?
 template <>
 bool CaffeClassifier<cv::Mat>::IsGPU(void) const
 {
