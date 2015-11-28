@@ -124,7 +124,7 @@ void detectMultiscale(CaffeClassifier<MatT> &classifier,
    // values. Convert it once here rather than later for every
    // individual input image.
    MatT f32Img;
-   input.convertTo(f32Img, CV_32FC3);
+   MatT(input).convertTo(f32Img, CV_32FC3);
 
    // Create array of scaled images
    scalefactor(f32Img, classifierSize, minSize, maxSize, 1.35, scaledImages, scales);

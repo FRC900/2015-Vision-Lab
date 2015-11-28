@@ -11,9 +11,9 @@ CaffeClassifier<MatT>::CaffeClassifier(const std::string& model_file,
       const int batch_size) {
 
    if (IsGPU())
-      caffe::Caffe::set_mode(caffe::Caffe::GPU);
+   	caffe::Caffe::set_mode(caffe::Caffe::GPU);
    else
-      caffe::Caffe::set_mode(caffe::Caffe::CPU);
+   	caffe::Caffe::set_mode(caffe::Caffe::CPU);
 
    /* Set batchsize */
    batch_size_ = batch_size;
@@ -164,7 +164,7 @@ void CaffeClassifier<MatT>::SetMean(const std::string& mean_file)
    // Hack to possibly convert to GpuMat - if MatT is GpuMat,
    // this will upload the Mat object to a GpuMat, otherwise
    // it will just copy it to the member variable mean_
-   mean_ = MatT(cv::Mat(input_geometry_, mean.type(), channel_mean));
+   mean_ = MatT(input_geometry_, mean.type(), channel_mean);
 }
 
 // TODO : see if we can do this once at startup or if
@@ -302,9 +302,13 @@ void CaffeClassifier<MatT>::PreprocessBatch(const std::vector<MatT> &imgs)
       std::vector<MatT> *input_channels = &input_batch.at(i);
       split(sample_normalized_, *input_channels);
 
-      //        CHECK(reinterpret_cast<float*>(input_channels->at(0).data)
-      //              == net_->input_blobs()[0]->cpu_data())
-      //          << "Input channels are not wrapping the input layer of the network.";
+#if 1
+      // TODO : CPU Mats + GPU Caffe fails if this isn't here, no idea why
+      if (i ==0 )
+              CHECK(reinterpret_cast<float*>(input_channels->at(0).data)
+                    == GetBlobData(net_->input_blobs()[0]))
+                << "Input channels are not wrapping the input layer of the network.";
+#endif
    }
 }
 
