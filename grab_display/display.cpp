@@ -1,10 +1,10 @@
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
 #include "opencv2/objdetect/objdetect.hpp"
-#include "highgui.h"
 #include <opencv2/opencv.hpp>
 
 #include <iostream>
+#include <iomanip>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -14,176 +14,415 @@
 
 using namespace std;
 using namespace cv;
-int frequency = 2;
-int myblur= 2;
-int lowedge= 100;
-int highedge= 300;
-int HueMax= 153;
-int HueMin= 113;
-int SatMax= 255;
-int SatMin= 199;
-int ValMax= 255;
-int ValMin= 190;
-int dilation_size = 0;
+int g_h_max = 170;
+int g_h_min = 130;
+int g_s_max = 255;
+int g_s_min = 147;
+int g_v_max = 255;
+int g_v_min = 48;
+int g_files_per = 10;
+int g_num_frames = 10;
+int g_min_resize = 0;
+int g_max_resize = 25;
 RNG rng(12345);
+template< typename T >
+string IntToHex(T i)
+{
+  stringstream stream;
+  stream << setfill ('0') << setw(2) << hex << i;
+  return stream.str();
+}
+bool FindRect(Mat &frame, Rect &output)
+{
+        /* prec: frame image &frame, integers 0-255 for each min and max HSV value
+        *  postc: a rectangle bounding the image we want
+        *  takes the frame image, filters to only find values in the range we want, finds
+        *  the counters of the object and bounds it with a rectangle
+        */
+        Mat btrack;
+        inRange(frame, Scalar(g_h_min, g_s_min, g_v_min), Scalar(g_h_max, g_s_max, g_v_max), btrack);
+        imshow("BtrackR", btrack);
+        vector<vector<Point> > contours;
+        vector<Vec4i> hierarchy;
+        vector<Point> points;
+        findContours( btrack, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0) );
+        for( size_t i = 0; i < hierarchy.size(); i++ )
+        {
+            if(hierarchy[i][3] >= 0 && boundingRect(contours[i]).area() > 1000)
+            {
+                points = contours[i];
+                break;
+            }
+        }
+        if(points.empty())
+        {
+            return false;
+        }
+        output = boundingRect(points);
+        return true;
+}
+Rect AdjustRect(Rect &frame, float ratio)
+{
+    // adjusts the size of the rectangle to a fixed aspect ratio 
+    Size rect_size = frame.size();
+    int width = rect_size.width;
+    int height = rect_size.height;
+    if (width / ratio > height)
+    {
+        height = width / ratio;
+    }
+    else if (width / ratio < height)
+    {
+        width = height * ratio;
+    }
+    Point tl = frame.tl();
+    tl.x = tl.x - (width - rect_size.width)/2;
+    tl.y = tl.y - (height - rect_size.height)/2;
+    Point br = frame.br();
+    br.x = br.x + (width - rect_size.width)/2;
+    br.y = br.y + (height - rect_size.height)/2;
+    return Rect(tl, br);
+}
+bool ResizeRect(Rect &the_rect, Rect &output_rect, const Mat image_cool)
+{
+    //takes the rect &the_rect and randomly resizes it larger within range (g_min_resize, g_max_resize) outputs the rect
+    //to image imageCool
+    Point tl = the_rect.tl();
+    Point br = the_rect.br();
+    if(tl.x < 0 || tl.y < 0 || br.x > image_cool.cols || br.y > image_cool.rows)
+    {
+        cout << "Rectangle out of bounds!" << endl;
+        return false;
+    }
+    tl = Point(-1,-1);
+    while (tl.x < 0 || tl.y < 0 || br.x > image_cool.cols || br.y > image_cool.rows)
+    {
+        float adjust = rng.uniform(g_min_resize,g_max_resize);
+        Size rect_size = the_rect.size();
+        float width = rect_size.width * (1 + adjust/100);
+        float height = rect_size.height * (1 + adjust/100);
+        tl = the_rect.tl();
+        tl.x = tl.x - (width - rect_size.width)/2;
+        tl.y = tl.y - (height - rect_size.height)/2;
+        br = the_rect.br();
+        br.x = br.x + (width - rect_size.width)/2;
+        br.y = br.y + (height - rect_size.height)/2;
+    }
+    output_rect = Rect(tl, br);
+    return true;
+}
+void usage(char *argv[])
+{
+    cout << "usage: " << argv[0] << " [-r RGBM RGBT] [-f frames] [-i files] [--min min] [--max max] filename1 [filename2...]" << endl << endl;
+    cout << "-r         RGBM and RGBT are hex colors RRGGBB; M is the median value and T is the threshold above or below the median" << endl;
+    cout << "-f         frames is the number of frames grabbed from a video" << endl;
+    cout << "-i         files is the number of output image files per frame" << endl;
+    cout << "--min      min is the minimum percentage (as a decimal) for resizing for detection" << endl;
+    cout << "--max      max is the max percentage (as a decimal) for resizing for detection" << endl;
+}
+Vector<string> Arguments(int argc, char *argv[])
+{
+    size_t temp_pos;
+    int temp_int;
+    Vector<string> vid_names;
+    vid_names.push_back("");
+    if(argc < 2)
+    {
+        usage(argv);
+    }
+    else if(argc == 2)
+    {
+        vid_names[0] = argv[1];
+    }
+    else
+    {
+        for(int i = 0; i < argc; i++)
+        {
+            if(strncmp(argv[i],"-r",2) == 0)
+            {
+                try
+                {
+                    stoi(argv[i+1], &temp_pos, 16);
+                    if(temp_pos != 6)
+                    {
+                        cout << "Wrong number of hex digits for param -r!" << endl;
+                        break;
+                    }
+                    stoi(argv[i+2], &temp_pos, 16);
+                    if(temp_pos != 6)
+                    {   
+                        cout << "Wrong number of hex digits for param -r!" << endl;
+                        break;
+                    }
+                }
+                catch(...) 
+                {
+                    usage(argv);
+                    break;
+                }
+                temp_int = stoi(argv[i+1], &temp_pos, 16);
+                g_h_min = temp_int/65536;
+                temp_int -= g_h_min*65536;
+                g_s_min = temp_int/256;
+                temp_int -= g_s_min*256;
+                g_v_min = temp_int;
+                temp_int = stoi(argv[i+2], &temp_pos, 16);
+                g_h_max = temp_int/65536;
+                temp_int -= g_h_min*65536;
+                g_s_max = temp_int/256;
+                temp_int -= g_s_min*256;
+                g_v_max = temp_int; 
+                i += 2;
+            }
+            else if(strncmp(argv[i],"-f",2) == 0)
+            {
+                try
+                {
+                    if(stoi(argv[i+1]) < 1)
+                    {
+                        cout << "Must get at least one frame per file!" << endl;
+                        break; 
+                    }
+                }
+                catch(...)
+                {
+                    usage(argv);
+                    break;
+                }
+                g_num_frames = stoi(argv[i+1]);
+                i += 1;
+            }
+            else if(strncmp(argv[i],"--min",4) == 0)
+            {
+                try
+                {
+                    if(stoi(argv[i+1]) < 1)
+                    {
+                        cout << "Cannot resize below 0%!" << endl;
+                        break; 
+                    }
+                }
+                catch(...)
+                {
+                    usage(argv);
+                    break;
+                }
+                g_min_resize = stoi(argv[i+1]);
+                i++;
+            }  
+            else if(strncmp(argv[i], "--max",4) == 0)
+            {
+                try
+                {
+                    stoi(argv[i+1]);
+                }
+                catch(...)
+                {
+                    usage(argv);
+                    break;
+                }
+                g_max_resize = stoi(argv[i+1]);
+                i++;
+            }
+            if(strncmp(argv[i], "-i", 2) == 0)
+            {
+                try
+                {
+                    if(stoi(argv[i+1]) < 1)
+                    {
+                        cout << "Must output at least 1 file per frame!" << endl;
+                        break;
+                    }
+                }
+                catch(...)
+                {
+                    usage(argv);
+                    break;
+                }
+                g_files_per = stoi(argv[i+1]);
+                i++;
+            }
+            else if(argv[i] != argv[0])
+            {
+                for(; i < argc; i++)
+                {
+                    if(vid_names[0] == "")
+                    {
+                        vid_names[0] = argv[i];
+                    }
+                    else 
+                    {
+                        vid_names.push_back(argv[i]); 
+                    }
+                }
+            }
+        } 
+    }
+    return vid_names;    
+}
+int main(int argc, char *argv[]) {
+    Vector<string> vid_names = Arguments(argc, argv);
+    if(vid_names[0] == "")
+    {
+        cout << "Invalid program syntax!" << endl;
+        return 0;
+    }
+    namedWindow("Original", WINDOW_AUTOSIZE);
+    namedWindow("RangeControl", WINDOW_AUTOSIZE);
+    namedWindow("Tracking", WINDOW_AUTOSIZE);
 
+    createTrackbar("HueMin","RangeControl", &g_h_min,255);
+    createTrackbar("HueMax","RangeControl", &g_h_max,255);
 
-int main() {
-	namedWindow("Original", WINDOW_AUTOSIZE);
-	//namedWindow("Parameters",WINDOW_AUTOSIZE);
-	//namedWindow("Red", WINDOW_AUTOSIZE);
-	//namedWindow("Green", WINDOW_AUTOSIZE);
-	//namedWindow("Blue", WINDOW_AUTOSIZE);
-	namedWindow("RangeControl", WINDOW_AUTOSIZE);
-	namedWindow("Tracking", WINDOW_AUTOSIZE);
-	
-	createTrackbar( "Kernel size:\n 2n + 1", "RangeControl", &dilation_size, 21);
+    createTrackbar("SatMin","RangeControl", &g_s_min,255);
+    createTrackbar("SatMax","RangeControl", &g_s_max,255);
 
-	createTrackbar("HueMax","RangeControl", &HueMax,255);
-	createTrackbar("HueMin","RangeControl", &HueMin,255);
+    createTrackbar("ValMin","RangeControl", &g_v_min,255);
+    createTrackbar("ValMax","RangeControl", &g_v_max,255);
 
-	createTrackbar("SatMax","RangeControl", &SatMax,255);
-	createTrackbar("SatMin","RangeControl", &SatMin,255);
+    String vid_name = "";
+    Mat mid = Mat_<Vec3b>(1,1) << Vec3b((g_h_min + g_h_max)/2, (g_s_min + g_s_max)/2, (g_v_min + g_v_max)/2);
+    cvtColor(mid, mid, CV_HSV2BGR);
+    for(int i = 0; i < vid_names.size(); i++)
+    {
+        vid_name = vid_names[i];
+        cout << vid_name << endl;
+        VideoCapture frame_video("videos/" + vid_name);
 
-	createTrackbar("ValMax","RangeControl", &ValMax,255);
-	createTrackbar("Valmin","RangeControl", &ValMin,255);
+        if(!frame_video.isOpened())
+        {
+            cout << "Capture not open; invalid video" << endl;
+            continue;
+        }
 
+        Mat frame;
+        Mat hsv_input;
 
-	createTrackbar("Blur","Parameters", &myblur,10);
-	createTrackbar("LowEdge","Parameters", &lowedge,1000);
-	createTrackbar("HighEdge","Parameters", &highedge,2000);
+        vector<Mat> channels;
+        vector<Mat> temp2(3);
 
-	createTrackbar("Frequency","Parameters", &frequency,10);
-   	VideoCapture inputVideo(0);
-	
-	if(!inputVideo.isOpened())
-		cout << "Capture not open" << endl;
+        int count = 0;
+        bool isColor = true;
 
-	Mat input;
-	Mat hsvinput;
-
-	vector<Mat> channels;
-	vector<Mat> temp2(3);
-
-	int count = 0;
-	bool isColor = true;
-
-	Mat temp;
-	Mat hue;
-	Mat sat;
-	Mat val;
-
-	//inputVideo >> input;
-
-		
-
-	
-
-	
-
-	while(1) {
-		input = imread("/home/ubuntu/Desktop/Secret Test Images/15 ft 00 deg.jpg",CV_LOAD_IMAGE_COLOR);
-		cvtColor( input, hsvinput, CV_BGR2HSV);
-		Mat zero = Mat::zeros(input.rows, input.cols, CV_8UC1);
-
-		//inputVideo >> input;
-		if(frequency == 0)
-			frequency = 1;
-		if(count % frequency == 0)
-			isColor = !isColor;
-		split(hsvinput, channels);
-
-
-		/* if(!isColor) 
-{	
-			temp = channels[2];
-			channels[2] = channels[0];
-			channels[0] = temp;
-			merge(channels, input);	
-		} */
-
-		
-
-		imshow("HSV", hsvinput);
-		/*
-		temp2[0] = channels[0];
-		temp2[1] = zero;
-		temp2[2] = zero;
-		merge(temp2, blue);	
-		//imshow("Blue", blue);
-
-		temp2[0] = zero;
-		temp2[1] = channels[1];
-		merge(temp2, green);
-		//imshow("Green", green);
-
-		temp2[1] = zero;
-		temp2[2] = channels[2];
-		merge(temp2, red);
-		//imshow("Red", red);
-		*/
-		vector<Mat> comp(3);
-		
-
-                inRange(channels[0], HueMin, HueMax, comp[0]);
-		inRange(channels[1], SatMin, SatMax, comp[1]);
-		inRange(channels[2], ValMin, ValMax, comp[2]);
-
-		Mat btrack;
-
-		bitwise_and(comp[0], comp[1], btrack);
-		bitwise_and(btrack, comp[2], btrack);
-
-		int dilation_type = MORPH_RECT;
-		
-
-		Mat element = getStructuringElement( dilation_type, 
-				Size( 2*dilation_size + 1, 2*dilation_size+1 ), 
-				Point( dilation_size, dilation_size ) );
-		
-
-		dilate(btrack, btrack, element);
-		imshow("Tracking", btrack);
-		
-      //BlueMax 73, BlueMin 0, RedMax 174, RedMin 127, GreenMax 75, GreenMin 0 
-		
-
-		/* GaussianBlur(input, input, Size(9,9), myblur); 
-		imshow("Blur", input); */
-  vector<vector<Point> > contours;
-  vector<Vec4i> hierarchy;
-
-  /// Detect edges using canny
-Canny(btrack, temp, lowedge, highedge, 3);
-  /// Find contours
-  findContours( temp, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0) );
- vector<Moments> mu(contours.size() );
-  for( int i = 0; i < contours.size(); i++ )
-     { mu[i] = moments( contours[i], false ); }
-
-  ///  Get the mass centers:
-  vector<Point2f> mc( contours.size() );
-  for( int i = 0; i < contours.size(); i++ )
-     { mc[i] = Point2f( mu[i].m10/mu[i].m00 , mu[i].m01/mu[i].m00 ); }
-
-
-
-
-
-  /// Draw contours
-  Mat drawing = Mat::zeros( temp.size(), CV_8UC3 );
-  for( int i = 0; i< contours.size(); i++ )
-     {
-	std::cout<<contours.size()<<std::endl;
-       Scalar color = Scalar( rng.uniform(0, 255), rng.uniform(0,255), rng.uniform(0,255) );
-       drawContours( input, contours, i, color, 2, 8, hierarchy, 0, Point() );
-       circle( input, mc[i], 4, color, -1, 8, 0 );
-     }
-		
-		//imshow("temp", temp);
-		imshow("Edges", input);
-count++;
-		if(waitKey(5) >= 0) break;
-   	}
-	return 0;
+        Mat temp;
+        Mat hue;
+        Mat sat;
+        Mat val;
+        Mat rgbVal;
+        Mat ret;
+        Mat gframe;
+        Mat variancem;
+        Mat tempm;
+        float variance;
+        Vector<float> lblur(g_num_frames);
+        int frame_counter = 0;
+        int frame_holder[g_num_frames];
+        String write_name = "";
+        while(1) {
+            frame_counter = frame_video.get(CV_CAP_PROP_POS_MSEC);
+            frame_video.read(frame);
+            if(frame.empty())
+            {
+                break;
+            }
+            frame_counter++;
+            bool exists;
+            Rect bounding_rect;
+            Rect temp_rect;
+            cvtColor(frame, hsv_input, CV_BGR2HSV);
+            exists = FindRect(hsv_input, bounding_rect);
+            if(exists == false)
+            {
+                continue;
+            }
+            bounding_rect = AdjustRect(bounding_rect, 1.0);
+            exists = ResizeRect(bounding_rect, temp_rect, hsv_input);
+            if(exists == false)
+            {
+                continue;
+            }
+            cvtColor( frame, gframe, CV_BGR2GRAY);
+            Laplacian(gframe, temp, CV_8UC1);
+            meanStdDev(temp, tempm, variancem);
+            variance = pow(variancem.at<Scalar>(0,0)[0], 2);
+            int min_pos = distance(lblur.begin(), min_element(lblur.begin(), lblur.end()));
+            if (variance > lblur[min_pos])
+            {
+                lblur[min_pos] = variance;
+                frame_holder[min_pos] = frame_counter;
+            }
+        }     
+        for(int j = 0; j < g_num_frames; j++)
+        {               
+            frame_video.set(CV_CAP_PROP_POS_MSEC, frame_holder[j]);
+            frame_video >> frame;
+            Rect bounding_rect;
+            Rect final_rect;
+            cvtColor(frame, hsv_input, CV_BGR2HSV);
+            FindRect(hsv_input, bounding_rect);
+            Mat btrack;
+            inRange(hsv_input, Scalar(g_h_min, g_s_min, g_v_min), Scalar(g_h_max, g_s_max, g_v_max), btrack);
+            vector<vector<Point> > contours;
+            vector<Vec4i> hierarchy;
+            int contour_index;
+            Mat btrack_cp;
+            btrack_cp = btrack;
+            findContours( btrack_cp, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0) );
+            for( size_t i = 0; i < hierarchy.size(); i++ )
+            {  
+                if(hierarchy[i][3] >= 0 && boundingRect(contours[i]).area() > 1000)
+                {
+                    contour_index = i;
+                    break;
+                }
+            }
+            drawContours(btrack, contours, contour_index, Scalar(255), CV_FILLED);
+            int dilation_type = MORPH_RECT;
+            int dilation_size = 1;
+            Mat element = getStructuringElement( dilation_type,
+                                             Size( 2*dilation_size + 1, 2*dilation_size+1 ),
+                                             Point( dilation_size, dilation_size ) );
+            dilate(btrack, btrack, element);
+            int erosion_size = 5;
+            element = getStructuringElement( dilation_type,
+                                             Size( 2*erosion_size + 1, 2*erosion_size+1 ),
+                                             Point( erosion_size, erosion_size ) );
+            erode(btrack, btrack, element ); 
+            for(int k = 0; k < btrack.rows; k++)
+            {
+                for(int l = 0; l < btrack.cols; l++)
+                {
+                    uchar point = btrack.at<uchar>(k,l);
+                    if(point == 0)
+                    {
+                        frame.at<Vec3b>(k,l) = mid.at<Vec3b>(0,0);
+                    }
+                }
+            }
+            imshow("Finished", frame);
+            bounding_rect = AdjustRect(bounding_rect, 1.0);
+            for(int k = 0; k < g_files_per; k++)
+            { 
+                ResizeRect(bounding_rect, final_rect, hsv_input);
+                Mat btrack;
+                write_name = "images/" + vid_name + "_" + to_string(j) + "_" + to_string(k) + ".png";
+                imshow("Edges", frame(final_rect));
+                imwrite(write_name, frame(final_rect));
+            }
+            waitKey(1000);
+        }
+        for(int j = 0; j < g_num_frames; j++)
+        {
+            cout << lblur[j] << ",";
+        }
+        cout << endl;
+        for(int j = 0; j < g_num_frames; j++)
+        {
+            cout << frame_holder[j] << ",";
+        } 
+        cout << endl;
+    }
+    cout << "0x" << IntToHex((g_h_min + g_h_max)/2) << IntToHex((g_s_min + g_s_max)/2) << IntToHex((g_v_min + g_v_max)/2);
+    cout << " 0x" << IntToHex((g_h_min + g_h_max)/2 - g_h_min) << IntToHex((g_s_min + g_s_max)/2 - g_s_min) << IntToHex((g_v_min + g_v_max)/2 - g_v_min) << endl;
+    return 0;
 }

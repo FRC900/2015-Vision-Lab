@@ -8,9 +8,32 @@
 *.so.*
 *.dylib
 
+# Intermediate files
+*.o
+*.obj
+*.lib
+*.a
+
 # Executables
+CaffeBatchPrediction
+CaffePrediction
+display
+opencv_createsamples_color
+scalefactor
 *.exe
+*.stackdump
+
+# Backups and temps from editors
+*~
+*.bak
+*.sw[po]
 
 # Metadata
 *.aliases
 *.lvlps
+
+# CMake output
+CMakeFiles
+CMakeCache.txt
+cmake_install.cmake
+Makefile
