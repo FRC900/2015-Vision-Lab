@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <time.h>
+#include <string>
 
 using namespace std;
 using namespace cv;
@@ -130,11 +131,11 @@ void usage(char *argv[])
     cout << "--min      min is the minimum percentage (as a decimal) for resizing for detection" << endl;
     cout << "--max      max is the max percentage (as a decimal) for resizing for detection" << endl;
 }
-Vector<string> Arguments(int argc, char *argv[])
+vector<string> Arguments(int argc, char *argv[])
 {
     size_t temp_pos;
     int temp_int;
-    Vector<string> vid_names;
+    vector<string> vid_names;
     vid_names.push_back("");
     if(argc < 2)
     {
@@ -160,12 +161,12 @@ Vector<string> Arguments(int argc, char *argv[])
                     }
                     stoi(argv[i+2], &temp_pos, 16);
                     if(temp_pos != 6)
-                    {   
+                    {
                         cout << "Wrong number of hex digits for param -r!" << endl;
                         break;
                     }
                 }
-                catch(...) 
+                catch(...)
                 {
                     usage(argv);
                     break;
@@ -271,7 +272,7 @@ Vector<string> Arguments(int argc, char *argv[])
     return vid_names;    
 }
 int main(int argc, char *argv[]) {
-    Vector<string> vid_names = Arguments(argc, argv);
+    vector<string> vid_names = Arguments(argc, argv);
     if(vid_names[0] == "")
     {
         cout << "Invalid program syntax!" << endl;
@@ -324,7 +325,7 @@ int main(int argc, char *argv[]) {
         Mat variancem;
         Mat tempm;
         float variance;
-        Vector<float> lblur(g_num_frames);
+        vector<float> lblur(g_num_frames);
         int frame_counter = 0;
         int frame_holder[g_num_frames];
         String write_name = "";
