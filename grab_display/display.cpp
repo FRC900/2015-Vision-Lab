@@ -25,6 +25,16 @@ int g_num_frames = 10;
 int g_min_resize = 0;
 int g_max_resize = 25;
 RNG rng(12345);
+#ifdef __CYGWIN__
+inline string
+to_string(int __val)
+{ return __gnu_cxx::__to_xstring<string>(vsnprintf, 4 * sizeof(int),                          
+    "%d", __val); }
+inline int 
+stoi(const wstring& __str, size_t* __idx = 0, int __base = 10)
+{ return __gnu_cxx::__stoa<long, int>(&std::wcstol, "stoi", __str.c_str(),
+                     __idx, __base); }
+#endif
 template< typename T >
 string IntToHex(T i)
 {
@@ -404,12 +414,10 @@ int main(int argc, char *argv[]) {
             for(int k = 0; k < g_files_per; k++)
             { 
                 ResizeRect(bounding_rect, final_rect, hsv_input);
-                Mat btrack;
                 write_name = "images/" + vid_name + "_" + to_string(j) + "_" + to_string(k) + ".png";
                 imshow("Edges", frame(final_rect));
                 imwrite(write_name, frame(final_rect));
             }
-            waitKey(1000);
         }
         for(int j = 0; j < g_num_frames; j++)
         {
