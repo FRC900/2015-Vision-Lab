@@ -25,13 +25,29 @@ int g_files_per = 10;
 int g_num_frames = 10;
 int g_min_resize = 0;
 int g_max_resize = 25;
+string g_outputdir = ".";
 RNG rng(12345);
+#ifdef __CYGWIN__
+inline string
+to_string(int __val)
+{ return __gnu_cxx::__to_xstring<string>(vsnprintf, 4 * sizeof(int),
+    "%d", __val); }
+inline int
+stoi(const wstring& __str, size_t* __idx = 0, int __base = 10)
+{ return __gnu_cxx::__stoa<long, int>(&std::wcstol, "stoi", __str.c_str(),
+                     __idx, __base); }
+#endif
 template< typename T >
 string IntToHex(T i)
 {
   stringstream stream;
   stream << setfill ('0') << setw(2) << hex << i;
   return stream.str();
+}
+string Behead(string my_string)
+{
+    size_t found = my_string.rfind("/");
+    return my_string.substr(found+1);
 }
 bool FindRect(Mat &frame, Rect &output)
 {
@@ -64,7 +80,7 @@ bool FindRect(Mat &frame, Rect &output)
 }
 Rect AdjustRect(Rect &frame, float ratio)
 {
-    // adjusts the size of the rectangle to a fixed aspect ratio 
+    // adjusts the size of the rectangle to a fixed aspect ratio
     Size rect_size = frame.size();
     int width = rect_size.width;
     int height = rect_size.height;
@@ -120,12 +136,13 @@ void usage(char *argv[])
     cout << "-i         files is the number of output image files per frame" << endl;
     cout << "--min      min is the minimum percentage (as a decimal) for resizing for detection" << endl;
     cout << "--max      max is the max percentage (as a decimal) for resizing for detection" << endl;
+    cout << "-o         change output directory from cwd/images to [option]/images" << endl;
 }
-Vector<string> Arguments(int argc, char *argv[])
+vector<string> Arguments(int argc, char *argv[])
 {
     size_t temp_pos;
     int temp_int;
-    Vector<string> vid_names;
+    vector<string> vid_names;
     vid_names.push_back("");
     if(argc < 2)
     {
@@ -139,7 +156,7 @@ Vector<string> Arguments(int argc, char *argv[])
     {
         for(int i = 0; i < argc; i++)
         {
-            if(strncmp(argv[i],"-r",2) == 0)
+            if(strncmp(argv[i], "-r", 2) == 0)
             {
                 try
                 {
@@ -151,12 +168,12 @@ Vector<string> Arguments(int argc, char *argv[])
                     }
                     stoi(argv[i+2], &temp_pos, 16);
                     if(temp_pos != 6)
-                    {   
+                    {
                         cout << "Wrong number of hex digits for param -r!" << endl;
                         break;
                     }
                 }
-                catch(...) 
+                catch(...)
                 {
                     usage(argv);
                     break;
@@ -172,7 +189,7 @@ Vector<string> Arguments(int argc, char *argv[])
                 temp_int -= g_h_min*65536;
                 g_s_max = temp_int/256;
                 temp_int -= g_s_min*256;
-                g_v_max = temp_int; 
+                g_v_max = temp_int;
                 i += 2;
             }
             else if(strncmp(argv[i],"-f",2) == 0)
@@ -182,7 +199,7 @@ Vector<string> Arguments(int argc, char *argv[])
                     if(stoi(argv[i+1]) < 1)
                     {
                         cout << "Must get at least one frame per file!" << endl;
-                        break; 
+                        break;
                     }
                 }
                 catch(...)
@@ -200,7 +217,7 @@ Vector<string> Arguments(int argc, char *argv[])
                     if(stoi(argv[i+1]) < 1)
                     {
                         cout << "Cannot resize below 0%!" << endl;
-                        break; 
+                        break;
                     }
                 }
                 catch(...)
@@ -210,8 +227,8 @@ Vector<string> Arguments(int argc, char *argv[])
                 }
                 g_min_resize = stoi(argv[i+1]);
                 i++;
-            }  
-            else if(strncmp(argv[i], "--max",4) == 0)
+            }
+            else if(strncmp(argv[i], "--max", 4) == 0)
             {
                 try
                 {
@@ -225,7 +242,7 @@ Vector<string> Arguments(int argc, char *argv[])
                 g_max_resize = stoi(argv[i+1]);
                 i++;
             }
-            if(strncmp(argv[i], "-i", 2) == 0)
+            else if(strncmp(argv[i], "-i", 2) == 0)
             {
                 try
                 {
@@ -243,6 +260,11 @@ Vector<string> Arguments(int argc, char *argv[])
                 g_files_per = stoi(argv[i+1]);
                 i++;
             }
+            else if(strncmp(argv[i], "-o", 2) == 0)
+            {
+                g_outputdir = argv[i+1];
+                i++;
+            }
             else if(argv[i] != argv[0])
             {
                 for(; i < argc; i++)
@@ -251,18 +273,18 @@ Vector<string> Arguments(int argc, char *argv[])
                     {
                         vid_names[0] = argv[i];
                     }
-                    else 
+                    else
                     {
-                        vid_names.push_back(argv[i]); 
+                        vid_names.push_back(argv[i]);
                     }
                 }
             }
-        } 
+        }
     }
-    return vid_names;    
+    return vid_names;
 }
 int main(int argc, char *argv[]) {
-    Vector<string> vid_names = Arguments(argc, argv);
+    vector<string> vid_names = Arguments(argc, argv);
     if(vid_names[0] == "")
     {
         cout << "Invalid program syntax!" << endl;
@@ -288,7 +310,7 @@ int main(int argc, char *argv[]) {
     {
         vid_name = vid_names[i];
         cout << vid_name << endl;
-        VideoCapture frame_video("videos/" + vid_name);
+        VideoCapture frame_video(vid_name);
 
         if(!frame_video.isOpened())
         {
@@ -315,7 +337,7 @@ int main(int argc, char *argv[]) {
         Mat variancem;
         Mat tempm;
         float variance;
-        Vector<float> lblur(g_num_frames);
+        vector<float> lblur(g_num_frames);
         int frame_counter = 0;
         int frame_holder[g_num_frames];
         String write_name = "";
@@ -352,9 +374,9 @@ int main(int argc, char *argv[]) {
                 lblur[min_pos] = variance;
                 frame_holder[min_pos] = frame_counter;
             }
-        }     
+        }
         for(int j = 0; j < g_num_frames; j++)
-        {               
+        {
             frame_video.set(CV_CAP_PROP_POS_MSEC, frame_holder[j]);
             frame_video >> frame;
             Rect bounding_rect;
@@ -370,7 +392,7 @@ int main(int argc, char *argv[]) {
             btrack_cp = btrack;
             findContours( btrack_cp, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0) );
             for( size_t i = 0; i < hierarchy.size(); i++ )
-            {  
+            {
                 if(hierarchy[i][3] >= 0 && boundingRect(contours[i]).area() > 1000)
                 {
                     contour_index = i;
@@ -388,7 +410,7 @@ int main(int argc, char *argv[]) {
             element = getStructuringElement( dilation_type,
                                              Size( 2*erosion_size + 1, 2*erosion_size+1 ),
                                              Point( erosion_size, erosion_size ) );
-            erode(btrack, btrack, element ); 
+            erode(btrack, btrack, element );
             for(int k = 0; k < btrack.rows; k++)
             {
                 for(int l = 0; l < btrack.cols; l++)
@@ -403,16 +425,15 @@ int main(int argc, char *argv[]) {
             imshow("Finished", frame);
             bounding_rect = AdjustRect(bounding_rect, 1.0);
             for(int k = 0; k < g_files_per; k++)
-            { 
+            {
                 ResizeRect(bounding_rect, final_rect, hsv_input);
-                Mat btrack;
-                write_name = "images/" + vid_name + "_" + to_string(j) + "_" + to_string(k) + ".png";
+                vid_name = Behead(vid_name);
+                write_name = g_outputdir + "/images/" + vid_name + "_" + to_string(j) + "_" + to_string(k) + ".png";
                 imshow("Edges", frame(final_rect));
                 imwrite(write_name, frame(final_rect));
             }
-            waitKey(1000);
         }
-        for(int j = 0; j < g_num_frames; j++)
+        /*for(int j = 0; j < g_num_frames; j++)
         {
             cout << lblur[j] << ",";
         }
@@ -420,8 +441,8 @@ int main(int argc, char *argv[]) {
         for(int j = 0; j < g_num_frames; j++)
         {
             cout << frame_holder[j] << ",";
-        } 
-        cout << endl;
+        }
+        cout << endl;*/
     }
     cout << "0x" << IntToHex((g_h_min + g_h_max)/2) << IntToHex((g_s_min + g_s_max)/2) << IntToHex((g_v_min + g_v_max)/2);
     cout << " 0x" << IntToHex((g_h_min + g_h_max)/2 - g_h_min) << IntToHex((g_s_min + g_s_max)/2 - g_s_min) << IntToHex((g_v_min + g_v_max)/2 - g_v_min) << endl;
