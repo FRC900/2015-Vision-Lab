@@ -93,8 +93,10 @@ void detectMultiscale(CaffeClassifier<MatT> &classifier,
 
    // List of scaled images and the corresponding resize scale
    // used to create it. TODO : redo as a std::pair?
-   std::vector<MatT> scaledImages;
-   std::vector<float> scales;
+   // std::vector<MatT> scaledImages;
+   //std::vector<float> scales;
+std::vector<std::pair<MatT, float> > scaledimages;
+std::pair<MatT, float> tempimages;
 
    // The detector can take a batch of input images
    // at a time. These arrays hold a set of sub-images
@@ -102,10 +104,11 @@ void detectMultiscale(CaffeClassifier<MatT> &classifier,
    // When enough are collected, run the whole batch through
    // the detectora in one batch
    // TODO : should probably also be redone as a std::pair
-   std::vector<MatT> imgs;    // input sub-images for this batch
-   std::vector<cv::Rect> rects;  // where those sub-images came from
+   // std::vector<MatT> imgs;    // input sub-images for this batch
+   // std::vector<cv::Rect> rects;  // where those sub-images came from
 				 // in the full input image
 
+std::vector<std::pair<MatT, cv::Rect> > imagesandrects;
    const cv::Size classifierSize = classifier.getInputGeometry();
 
    // How many pixels to move the window for each step
@@ -127,24 +130,24 @@ void detectMultiscale(CaffeClassifier<MatT> &classifier,
    MatT(input).convertTo(f32Img, CV_32FC3);
 
    // Create array of scaled images
-   scalefactor(f32Img, classifierSize, minSize, maxSize, 1.35, scaledImages, scales);
+   scalefactor(f32Img, classifierSize, minSize, maxSize, 1.35, tempimages.first, tempimages.second);
 
    // Main loop.  Look at each scaled image in turn
    for (size_t scale = 0; scale < scaledImages.size(); ++scale)
    {
       // Start at the upper left corner.  Loop through the rows and cols until
       // the detection window falls off the edges of the scaled image
-      for (int r = 0; (r + classifierSize.height) < scaledImages[scale].rows; r += step)
+      for (int r = 0; (r + classifierSize.height) < scaledImages[scale].first.rows; r += step)
       {
-	 for (int c = 0; (c + classifierSize.width) < scaledImages[scale].cols; c += step)
+	 for (int c = 0; (c + classifierSize.width) < scaledImages[scale].first.cols; c += step)
 	 {
 	    // Save location and image data for each sub-image
 	    rects.push_back(cv::Rect(c, r, classifierSize.width, classifierSize.height));
-	    imgs.push_back(scaledImages[scale](rects[rects.size() - 1]));
+	    imgs.push_back(scaledImages[scale].first(rects[rects.size() - 1]));
 	    // If batch_size images are collected, run the detection code
 	    if (imgs.size() == classifier.BatchSize())
 	    {
-	       doBatchPrediction(classifier, imgs, rects, scales[scale], detected);
+	       doBatchPrediction(classifier, imgs, rects, scaledimages[scale].second, detected);
 	       // Reset image list
 	       imgs.clear();
 	       rects.clear();
@@ -154,7 +157,7 @@ void detectMultiscale(CaffeClassifier<MatT> &classifier,
       // Finish up any left-over detection windows for this scaled image
       if (rects.size())
       {
-	 doBatchPrediction(classifier, imgs, rects, scales[scale], detected);
+	 doBatchPrediction(classifier, imgs, rects, scaledimages[scale].second, detected);
 	 imgs.clear();
 	 rects.clear();
       }
@@ -179,7 +182,7 @@ void doBatchPrediction(CaffeClassifier<MatT> &classifier,
       // Look for bins, > 90% confidence
       for (std::vector <Prediction>::const_iterator it = predictions[i].begin(); it != predictions[i].end(); ++it)
       {
-	 if (it->first == "bin") 
+	 if (it->first == "bins")
 	 {
 	    if (it->second > 0.9)
 	    {
