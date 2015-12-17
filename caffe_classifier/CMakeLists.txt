@@ -11,10 +11,10 @@ find_package( CUDA REQUIRED )
 find_package( Boost COMPONENTS system REQUIRED )
 include_directories( ${OpenCV_INCLUDE_DIRS} /home/ubuntu/caffe/build/include /home/ubuntu/caffe/include ${Boost_INCLUDE_DIR} ../nonmax_suppression "../Scale Factor" )
 
-find_library (LibCaffe caffe-nv PATH  /home/ubuntu/caffe/build/lib )
+find_library (LibCaffe caffe PATH  /home/ubuntu/caffe/build/lib )
 #find_library (LibProto proto PATH  /home/ubuntu/caffe/build/lib )
 find_library (LibGLOG  glog)
 find_library (LibProtobuf protobuf)
 
-cuda_add_executable( CaffeBatchPrediction ../nonmax_suppression/fast_nms.cpp main.cpp )
+cuda_add_executable( CaffeBatchPrediction ../nonmax_suppression/fast_nms.cpp main.cpp  CaffeBatchPrediction.cpp "../Scale Factor/scalefactor.cpp")
 target_link_libraries( CaffeBatchPrediction ${OpenCV_LIBS} ${LibCaffe} ${Boost_LIBRARIES} ${LibGLOG} ${LibProtobuf} )
