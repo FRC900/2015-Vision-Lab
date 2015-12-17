@@ -30,3 +30,7 @@ void scalefactor(MatT inputimage, cv::Size objectsize, cv::Size minsize, cv::Siz
 	
 	}	
 }
+
+// Explicitly generate code for Mat and GpuMat options
+template void scalefactor(cv::Mat inputimage, cv::Size objectsize, cv::Size minsize, cv::Size maxsize, float scaleFactor, std::vector<cv::Mat> &images, std::vector<float> &scales);
+template void scalefactor(cv::gpu::GpuMat inputimage, cv::Size objectsize, cv::Size minsize, cv::Size maxsize, float scaleFactor, std::vector<cv::gpu::GpuMat> &images, std::vector<float> &scales);

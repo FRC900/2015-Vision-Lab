@@ -3,6 +3,8 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/gpu/gpu.hpp>
 
+#include "CaffeBatchPrediction.hpp"
+
 template <class MatT>
 CaffeClassifier<MatT>::CaffeClassifier(const std::string& model_file,
       const std::string& trained_file,
@@ -360,3 +362,6 @@ bool CaffeClassifier<cv::gpu::GpuMat>::IsGPU(void) const
 {
    return true;
 }
+
+template class CaffeClassifier<cv::Mat>;
+template class CaffeClassifier<cv::gpu::GpuMat>;
