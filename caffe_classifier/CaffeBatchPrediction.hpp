@@ -97,5 +97,4 @@ class CaffeClassifier {
   std::vector< std::vector<MatT> > input_batch; // net input buffers wrapped in Mat's
 };
 
-#include "CaffeBatchPrediction.cpp"
 #endif

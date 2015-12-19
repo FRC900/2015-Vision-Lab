@@ -4,6 +4,7 @@
 #include "fast_nms.hpp"
 
 #include <opencv2/highgui/highgui.hpp>
+#include <opencv2/gpu/gpu.hpp>
 
 static double gtod_wrapper(void)
 {
@@ -40,8 +41,8 @@ int main(int argc, char *argv[])
    std::string trained_file = argv[2];
    std::string mean_file    = argv[3];
    std::string label_file   = argv[4];
-   CaffeClassifier <cv::Mat> classifier(model_file, trained_file, mean_file, label_file, 64 );
-   //CaffeClassifier <cv::gpu::GpuMat> classifier(model_file, trained_file, mean_file, label_file, 64 );
+   //CaffeClassifier <cv::Mat> classifier(model_file, trained_file, mean_file, label_file, 64 );
+   CaffeClassifier <cv::gpu::GpuMat> classifier(model_file, trained_file, mean_file, label_file, 64 );
 
    std::string file = argv[5];
    cv::Mat inputImg = cv::imread(file, -1);
@@ -93,10 +94,7 @@ void detectMultiscale(CaffeClassifier<MatT> &classifier,
 
    // List of scaled images and the corresponding resize scale
    // used to create it. TODO : redo as a std::pair?
-   // std::vector<MatT> scaledImages;
-   //std::vector<float> scales;
-std::vector<std::pair<MatT, float> > scaledimages;
-std::pair<MatT, float> tempimages;
+	std::vector<std::pair<MatT, float> > scaledimages;
 
    // The detector can take a batch of input images
    // at a time. These arrays hold a set of sub-images
@@ -104,11 +102,12 @@ std::pair<MatT, float> tempimages;
    // When enough are collected, run the whole batch through
    // the detectora in one batch
    // TODO : should probably also be redone as a std::pair
-   // std::vector<MatT> imgs;    // input sub-images for this batch
-   // std::vector<cv::Rect> rects;  // where those sub-images came from
+   std::vector<MatT> imgs;    // input sub-images for this batch
+   std::vector<cv::Rect> rects;  // where those sub-images came from
 				 // in the full input image
 
-std::vector<std::pair<MatT, cv::Rect> > imagesandrects;
+//std::vector<std::pair<MatT, cv::Rect> > imagesandrects;
+//
    const cv::Size classifierSize = classifier.getInputGeometry();
 
    // How many pixels to move the window for each step
@@ -130,20 +129,20 @@ std::vector<std::pair<MatT, cv::Rect> > imagesandrects;
    MatT(input).convertTo(f32Img, CV_32FC3);
 
    // Create array of scaled images
-   scalefactor(f32Img, classifierSize, minSize, maxSize, 1.35, tempimages.first, tempimages.second);
+   scalefactor(f32Img, classifierSize, minSize, maxSize, 1.35, scaledimages);
 
    // Main loop.  Look at each scaled image in turn
-   for (size_t scale = 0; scale < scaledImages.size(); ++scale)
+   for (size_t scale = 0; scale < scaledimages.size(); ++scale)
    {
       // Start at the upper left corner.  Loop through the rows and cols until
       // the detection window falls off the edges of the scaled image
-      for (int r = 0; (r + classifierSize.height) < scaledImages[scale].first.rows; r += step)
+      for (int r = 0; (r + classifierSize.height) < scaledimages[scale].first.rows; r += step)
       {
-	 for (int c = 0; (c + classifierSize.width) < scaledImages[scale].first.cols; c += step)
+	 for (int c = 0; (c + classifierSize.width) < scaledimages[scale].first.cols; c += step)
 	 {
 	    // Save location and image data for each sub-image
 	    rects.push_back(cv::Rect(c, r, classifierSize.width, classifierSize.height));
-	    imgs.push_back(scaledImages[scale].first(rects[rects.size() - 1]));
+	    imgs.push_back(scaledimages[scale].first(rects[rects.size() - 1]));
 	    // If batch_size images are collected, run the detection code
 	    if (imgs.size() == classifier.BatchSize())
 	    {
@@ -182,9 +181,10 @@ void doBatchPrediction(CaffeClassifier<MatT> &classifier,
       // Look for bins, > 90% confidence
       for (std::vector <Prediction>::const_iterator it = predictions[i].begin(); it != predictions[i].end(); ++it)
       {
-	 if (it->first == "bins")
+	 if ((it->first == "bin" ) ||
+	     (it->first == "bins") )
 	 {
-	    if (it->second > 0.9)
+	    if (it->second > 0.6)
 	    {
 #if 0
 	       stringstream s;

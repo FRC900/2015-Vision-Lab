@@ -1,10 +1,11 @@
 #include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/gpu/gpu.hpp>
+
 
 template<class MatT>
-void scalefactor(MatT inputimage, cv::Size objectsize, cv::Size minsize, cv::Size maxsize, float scaleFactor, std::vector<MatT> &images, std::vector<float> &scales) 
+void scalefactor(MatT inputimage, cv::Size objectsize, cv::Size minsize, cv::Size maxsize, float scaleFactor, std::vector<std::pair<MatT, float> > &scaleInfo)
 {
-	images.clear(); 
-	scales.clear();
+	scaleInfo.clear();
 	/*
 	Loop multiplying the image size by the scalefactor upto the maxsize	
 	Store each image in the images vector
@@ -23,10 +24,13 @@ void scalefactor(MatT inputimage, cv::Size objectsize, cv::Size minsize, cv::Siz
 		MatT outputimage;
 		resize(inputimage, outputimage, cv::Size(), scale, scale);
 		
-		images.push_back(outputimage);
-		scales.push_back(scale);
+		scaleInfo.push_back(std::pair<MatT, float>(outputimage, scale));
 
 		scale /= scaleFactor;		
 	
 	}	
 }
+
+// Explicitly generate code for Mat and GpuMat options
+template void scalefactor(cv::Mat inputimage, cv::Size objectsize, cv::Size minsize, cv::Size maxsize, float scaleFactor, std::vector<std::pair<cv::Mat, float> > &scaleInfo); 
+template void scalefactor(cv::gpu::GpuMat inputimage, cv::Size objectsize, cv::Size minsize, cv::Size maxsize, float scaleFactor, std::vector<std::pair<cv::gpu::GpuMat, float> > &scaleInfo);
