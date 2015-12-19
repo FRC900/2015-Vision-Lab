@@ -1,7 +1,6 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/gpu/gpu.hpp>
 
-
 template<class MatT>
 void scalefactor(MatT inputimage, cv::Size objectsize, cv::Size minsize, cv::Size maxsize, float scaleFactor, std::vector<std::pair<MatT, float> > &scaleInfo)
 {
