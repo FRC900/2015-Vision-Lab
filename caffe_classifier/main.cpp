@@ -122,6 +122,11 @@ void detectMultiscale(const std::string &model_file,
 
    generateInitialWindows(inputImg, minSize, maxSize, wsize, scaledimages, rects, scales);
    runDetection(classifier, scaledimages, rects, scales, .9, "bin", rectsOut, scalesOut);
+   for(size_t i = 0; i < rectsOut.size(); i++)
+   {
+      float scale = scaledimages[scalesOut[i]].second;
+      rectsOut[i] = cv::Rect(rectsOut[i].x/scale, rectsOut[i].y/scale, rectsOut[i].width/scale, rectsOut[i].height/scale);
+   }
 }
 template <class MatT>
 void generateInitialWindows( 
@@ -204,8 +209,8 @@ void runDetection(CaffeClassifier<MatT> &classifier,
 	images.clear();
         for(size_t j = 0; j < detected.size(); j++)
 	{
-	   rectsOut.push_back(rects[detected[counter*classifier.BatchSize() + j]]);
-	   scalesOut.push_back(scales[detected[counter*classifier.BatchSize() + j]]);
+	   rectsOut.push_back(rects[counter*classifier.BatchSize() + detected[j]]);
+	   scalesOut.push_back(scales[counter*classifier.BatchSize() + detected[j]]);
         }
         counter++;	
     }
@@ -222,6 +227,7 @@ void doBatchPrediction(CaffeClassifier<MatT> &classifier,
       const std::string &label,
       std::vector<size_t> &detected)
 {
+   detected.clear();
    std::vector <std::vector<Prediction> >predictions = classifier.ClassifyBatch(imgs, 1);
    // Each outer loop is the predictions for one input image
    for (size_t i = 0; i < imgs.size(); ++i)
