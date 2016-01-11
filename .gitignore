@@ -20,6 +20,7 @@ CaffePrediction
 display
 opencv_createsamples_color
 scalefactor
+vo
 *.exe
 *.stackdump
 
