@@ -2,7 +2,6 @@
 #include "opencv2/imgproc/imgproc.hpp"
 #include "opencv2/objdetect/objdetect.hpp"
 #include <opencv2/opencv.hpp>
-#include "display.h"
 
 #include <iostream>
 #include <iomanip>

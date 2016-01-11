@@ -39,19 +39,20 @@ $stage3       = $ARGV[5] if ($#ARGV > 4);
 
 if($stage1 eq "true")
 {
-    opendir(VIDEO, "$inputdir/videos");
+    opendir(VIDEO, "$inputdir");
     my @videos = ();
     while (my $file = readdir(VIDEO))
     {
         next unless $file =~ m/.+\.avi/;
+       	print "$file\n";
         push @videos, $file;
     }
     closedir(VIDEO);
-    for( my $k = 0; $k < $#videos; $k++)
+    for( my $k = 0; $k <= $#videos; $k++)
     {
         my $video = @videos[$k];
-        print "./display -o $outputdir $inputdir/videos/$video" . "\n";
-        system("./display -o $outputdir $inputdir/videos/$video");
+        print "./display -o $outputdir $inputdir/$video" . "\n";
+        system("./display -o $outputdir $inputdir/$video");
     }
     $inputdir = $outputdir;
 }
@@ -94,7 +95,7 @@ if($stage3 eq "true")
         push @calibration, $file;
     }
     closedir(LINE);
-    for( my $k = 0; $k < $#calibration; $k++)
+    for( my $k = 0; $k <= $#calibration; $k++)
     {
         my $img = $calibration[$k];
         print "./imageShift $inputdir/$img $outputdir/images" . "\n";
