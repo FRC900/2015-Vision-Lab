@@ -20,21 +20,13 @@ int main(int argc, char** argv)
 		imshow("image", input); 
 		for(int i = 0; i < images.size(); i++)
 		{
-		stringstream label; 
-		label << i;
-		imshow(label.str(), images[i]);
+			stringstream label; 
+			label << i;
+			imshow(label.str(), images[i]);
 		}
-
-		if (waitKey(5) >= 0) break;
+		if (waitKey(5) >= 0) 
+			break;
 	}
-
-	
-		
-
-	
-
-	
-	
 
 	return 0;
 }
